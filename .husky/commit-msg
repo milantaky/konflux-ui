@@ -70,8 +70,8 @@ if [ "$is_authorized" -eq 1 ]; then
   claude_active=$(check_ai_process_in_repo "claude")
   cursor_active=$(check_ai_process_in_repo "cursor")
 
-  echo "[commit-msg] claue active in repo? $claude_active"
-  echo "[commit-msg] curor active in repo? $cursor_active"
+  echo "[commit-msg] claude active in repo? $claude_active"
+  echo "[commit-msg] cursor active in repo? $cursor_active"
 
   # Fallback: check commit message content for AI markers
   COMMIT_MSG_CONTENT=$(cat "$COMMIT_MSG_FILE" || echo "")
