@@ -28,6 +28,7 @@ export const createQueryKeys = ({
     qp?.name !== undefined || qp?.creationTimestampAfter !== undefined
       ? [{ name: qp?.name, creationTimestampAfter: qp?.creationTimestampAfter }]
       : [];
+  const partialKey = queryOptions?.partialObjectMetadata ? ['partialObjectMetadata'] : [];
   return [
     ...(prefix ? [prefix] : []),
     queryOptions?.ns,
@@ -39,6 +40,7 @@ export const createQueryKeys = ({
     ...idKey,
     ...selector,
     ...filterParams,
+    ...partialKey,
   ];
 };
 

@@ -1,12 +1,36 @@
 import React from 'react';
+import {
+  K8S_SECRET_PARTIAL_OBJECT_METADATA_ACCEPT,
+  K8S_SECRET_PARTIAL_OBJECT_METADATA_LIST_ACCEPT,
+} from '~/consts/secrets';
 import { useK8sWatchResource } from '../k8s';
 import { SecretGroupVersionKind, SecretModel } from '../models';
 import { SecretKind } from '../types';
 
-export const useSecrets = (
-  namespace: string,
-  watch?: boolean,
-): [SecretKind[], boolean, unknown] => {
+/** Refetch interval when WebSocket watch is disabled (PartialObjectMetadataList). */
+const SECRETS_LIST_REFETCH_MS = 30_000;
+
+const secretListPartialMetadataFetchOptions = {
+  requestInit: {
+    headers: { Accept: K8S_SECRET_PARTIAL_OBJECT_METADATA_LIST_ACCEPT },
+  },
+};
+
+const secretGetPartialMetadataFetchOptions = {
+  requestInit: {
+    headers: { Accept: K8S_SECRET_PARTIAL_OBJECT_METADATA_ACCEPT },
+  },
+};
+
+/** React Query key for one-off full Secret GET (edit flow / submit merge). */
+export const getSecretFullQueryKey = (namespace: string, secretName: string) =>
+  ['SecretFull', namespace, secretName] as const;
+
+/**
+ * Lists Secrets with metadata-only items (`PartialObjectMetadataList` Accept header). WebSocket
+ * watch stays disabled because the browser cannot send that `Accept` on the watch handshake.
+ */
+export const useSecrets = (namespace: string): [SecretKind[], boolean, unknown] => {
   const {
     data: secrets,
     isLoading,
@@ -16,9 +40,15 @@ export const useSecrets = (
       groupVersionKind: SecretGroupVersionKind,
       namespace,
       isList: true,
-      watch,
+      watch: false,
+      partialMetadata: true,
     },
     SecretModel,
+    {
+      enabled: !!namespace,
+      refetchInterval: SECRETS_LIST_REFETCH_MS,
+    },
+    secretListPartialMetadataFetchOptions,
   );
 
   return React.useMemo(
@@ -44,8 +74,14 @@ export const useSecret = (
       groupVersionKind: SecretGroupVersionKind,
       namespace,
       name,
+      partialMetadata: true,
+      watch: false,
     },
     SecretModel,
+    {
+      enabled: !!namespace && !!name,
+    },
+    secretGetPartialMetadataFetchOptions,
   );
   return [secret, !isLoading, error];
 };

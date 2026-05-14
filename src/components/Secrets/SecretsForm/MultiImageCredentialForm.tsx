@@ -10,6 +10,7 @@ import { PlusCircleIcon } from '@patternfly/react-icons/dist/esm/icons/plus-circ
 import { FieldArray, useField } from 'formik';
 import { InputField } from 'formik-pf';
 import { uniqueId } from 'lodash-es';
+import { SecretPasswordFormField } from './SecretPasswordFormField';
 
 type MultiImageCredentialFormProps = {
   name: string;
@@ -74,10 +75,9 @@ export const MultiImageCredentialForm: React.FC<
                 helperText="For image registry authentication"
                 isRequired
               />
-              <InputField
+              <SecretPasswordFormField
                 name={`${name}.${idx.toString()}.password`}
                 label="Password"
-                type={TextInputTypes.password}
                 helperText="For image registry authentication"
                 placeholder={isEditMode ? 'To keep the same password, leave this field blank' : ''}
                 isRequired={!isEditMode}

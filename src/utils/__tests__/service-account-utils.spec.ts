@@ -1,6 +1,6 @@
 import { mockSecret } from '~/components/Secrets/__data__/mock-secrets';
 import { SecretModel, ServiceAccountModel } from '~/models';
-import { SecretKind, SecretType } from '~/types';
+import { SecretKind, SecretLabels, SecretType } from '~/types';
 import { SecretForComponentOption } from '~/utils/secrets/secret-utils';
 import {
   linkCommonSecretsToServiceAccount,
@@ -81,6 +81,20 @@ describe('isLinkableSecret', () => {
 
   it('should return false when secret is undefined', () => {
     expect(isLinkableSecret(undefined)).toBe(false);
+  });
+
+  it('should infer linkable basic-auth from scm labels when type omitted', () => {
+    const secret: SecretKind = {
+      ...imagePullSecretWithNamespace,
+      type: undefined,
+      metadata: {
+        ...imagePullSecretWithNamespace.metadata,
+        labels: {
+          [SecretLabels.CREDENTIAL_LABEL]: SecretLabels.CREDENTIAL_VALUE,
+        },
+      },
+    };
+    expect(isLinkableSecret(secret)).toBe(true);
   });
 });
 

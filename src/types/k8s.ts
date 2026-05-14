@@ -78,7 +78,10 @@ type _QueryOptions<S extends string | Selector> = {
 
 export type QueryOptions = _QueryOptions<string>;
 
-export type QueryOptionsWithSelector = _QueryOptions<Selector>;
+export type QueryOptionsWithSelector = _QueryOptions<Selector> & {
+  /** When true, list/get use Kubernetes PartialObjectMetadata Accept header (metadata-only). */
+  partialObjectMetadata?: boolean;
+};
 
 export type QueryParams<S extends string | Selector = string> = Partial<{
   watch: string;

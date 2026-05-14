@@ -82,13 +82,22 @@ export const SecretTypeSubForm: React.FC<React.PropsWithChildren<{ isEditMode?: 
 
   const selectedForm = React.useMemo(() => {
     const form = secretTypes.find((t) => t.label === currentType);
-    if (form?.key === 'source') {
-      form.component = (
-        <SourceSecretForm isEditMode={isEditMode} onAuthTypeChange={setCurrentAuthType} />
-      );
+    if (!form) {
+      return undefined;
     }
-    if (form?.key === 'image-pull') {
-      form.component = <ImagePullSecretForm isEditMode={isEditMode} />;
+    if (form.key === 'key-value') {
+      return { ...form, component: <KeyValueSecretForm isEditMode={isEditMode} /> };
+    }
+    if (form.key === 'source') {
+      return {
+        ...form,
+        component: (
+          <SourceSecretForm isEditMode={isEditMode} onAuthTypeChange={setCurrentAuthType} />
+        ),
+      };
+    }
+    if (form.key === 'image-pull') {
+      return { ...form, component: <ImagePullSecretForm isEditMode={isEditMode} /> };
     }
     return form;
   }, [currentType, isEditMode]);

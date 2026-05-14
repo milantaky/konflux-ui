@@ -28,7 +28,7 @@ export type K8sResourceDeleteOptions = K8sResourceBaseOptions & {
 };
 
 export type K8sResourceListOptions = K8sResourceBaseOptions<
-  Pick<Partial<QueryOptionsWithSelector>, 'ns' | 'queryParams'>
+  Pick<Partial<QueryOptionsWithSelector>, 'ns' | 'queryParams' | 'partialObjectMetadata'>
 >;
 
 export type K8sResourceListResult<TResource extends K8sResourceCommon> = {

@@ -1,5 +1,6 @@
 import React from 'react';
 import { PIPELINE_SERVICE_ACCOUNT_PREFIX } from '../consts/pipeline';
+import { K8S_SECRET_PARTIAL_OBJECT_METADATA_LIST_ACCEPT } from '../consts/secrets';
 import { useK8sWatchResource } from '../k8s';
 import { SecretGroupVersionKind, SecretModel } from '../models';
 import { SecretKind } from '../types';
@@ -18,8 +19,19 @@ export const useLinkedSecrets = (
       groupVersionKind: SecretGroupVersionKind,
       namespace,
       isList: true,
+      watch: false,
+      partialMetadata: true,
     },
     SecretModel,
+    {
+      enabled: !!namespace && !!componentName,
+      refetchInterval: 30_000,
+    },
+    {
+      requestInit: {
+        headers: { Accept: K8S_SECRET_PARTIAL_OBJECT_METADATA_LIST_ACCEPT },
+      },
+    },
   );
 
   const serviceAccountName = `${PIPELINE_SERVICE_ACCOUNT_PREFIX}${componentName}`;

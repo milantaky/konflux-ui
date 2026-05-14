@@ -7,6 +7,7 @@ import { ServiceAccountModel } from '~/models/service-account';
 import { processWithPLimit } from '~/shared/utils/retry-batch-utils';
 import { ComponentKind, LinkableSecretType, SecretKind, ServiceAccountKind } from '~/types';
 import {
+  inferSecretK8sTypeFromMetadata,
   isImagePullSecret,
   SecretForComponentOption,
   patchCommonSecretLabel,
@@ -85,7 +86,8 @@ export const isLinkableSecret = (secret: SecretKind): boolean => {
   }
 
   const linkableValues = Object.values(LinkableSecretType) as string[];
-  return linkableValues.includes(secret.type);
+  const effectiveType = inferSecretK8sTypeFromMetadata(secret) ?? secret.type;
+  return !!effectiveType && linkableValues.includes(effectiveType);
 };
 
 export const linkSecretsToBuildServiceAccount = async (

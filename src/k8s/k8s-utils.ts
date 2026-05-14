@@ -299,5 +299,6 @@ export const convertToK8sQueryParams = (
     ns: resourceInit.namespace,
     name: resourceInit.name,
     queryParams,
+    ...(resourceInit.partialMetadata ? { partialObjectMetadata: true } : {}),
   };
 };

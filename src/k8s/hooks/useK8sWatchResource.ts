@@ -6,6 +6,7 @@ import {
   UseQueryResult,
 } from '@tanstack/react-query';
 import { K8sModelCommon, K8sResourceCommon, WatchK8sResource } from '../../types/k8s';
+import type { K8sResourceBaseOptions } from '../k8s-fetch';
 import { convertToK8sQueryParams } from '../k8s-utils';
 import { TQueryOptions } from '../query/type';
 import { createGetQueryOptions, createListqueryOptions, createQueryKeys } from '../query/utils';
@@ -14,13 +15,14 @@ import { useK8sQueryWatch } from './useK8sQueryWatch';
 
 const POLLING_INTERVAL = 10000;
 
+type K8sWatchFetchOptions = Partial<NonNullable<K8sResourceBaseOptions['fetchOptions']>>;
+
 export const useK8sWatchResource = <R extends K8sResourceCommon | K8sResourceCommon[]>(
   resourceInit: WatchK8sResource,
   model: K8sModelCommon,
   queryOptions?: TQueryOptions<R>,
-  options: Partial<
-    WebSocketOptions & RequestInit & { wsPrefix?: string; pathPrefix?: string }
-  > = {},
+  options: Partial<WebSocketOptions & RequestInit & { wsPrefix?: string; pathPrefix?: string }> &
+    K8sWatchFetchOptions = {},
 ): UseQueryResult<R> => {
   const k8sQueryOptions = convertToK8sQueryParams(resourceInit);
   const wsError = useK8sQueryWatch(

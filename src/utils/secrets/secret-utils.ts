@@ -14,6 +14,7 @@ import {
   RemoteSecretStatusType,
   SecretByUILabel,
   SecretCondition,
+  SecretFor,
   SecretForComponentOption,
   SecretKind,
   SecretLabels,
@@ -28,8 +29,23 @@ import type { Patch } from '../../types/k8s';
 
 export { SecretForComponentOption };
 
+/**
+ * Best-effort `Secret.type` when the API omitted it (e.g. PartialObjectMetadata list/get).
+ */
+export const inferSecretK8sTypeFromMetadata = (obj: SecretKind): string | undefined => {
+  if (obj.type) {
+    return obj.type;
+  }
+  const labels = obj.metadata?.labels;
+  if (labels?.[SecretLabels.CREDENTIAL_LABEL] === SecretLabels.CREDENTIAL_VALUE) {
+    return SecretType.basicAuth;
+  }
+  return undefined;
+};
+
 export const isImagePullSecret = (secret: SecretKind): boolean => {
-  return IMAGE_PULL_SECRET_TYPES.includes(secret.type as (typeof IMAGE_PULL_SECRET_TYPES)[number]);
+  const t = inferSecretK8sTypeFromMetadata(secret);
+  return !!t && IMAGE_PULL_SECRET_TYPES.includes(t as (typeof IMAGE_PULL_SECRET_TYPES)[number]);
 };
 
 export type PartnerTask = {
@@ -131,6 +147,25 @@ export const typeToDropdownLabel = (type: string) => {
       return type;
   }
 };
+
+export const inferSecretTypeDropdown = (obj: SecretKind): SecretTypeDropdownLabel | undefined => {
+  if (obj.type) {
+    return typeToDropdownLabel(obj.type) as SecretTypeDropdownLabel;
+  }
+  const inferred = inferSecretK8sTypeFromMetadata(obj);
+  if (inferred) {
+    return typeToDropdownLabel(inferred) as SecretTypeDropdownLabel;
+  }
+  const labels = obj.metadata?.labels;
+  if (
+    labels?.[SecretByUILabel] === SecretFor.Build ||
+    labels?.[SecretByUILabel] === SecretFor.Deployment
+  ) {
+    return SecretTypeDropdownLabel.opaque;
+  }
+  return undefined;
+};
+
 /**
  * Normalizes uploaded Docker config JSON to the shape expected for
  * `kubernetes.io/dockerconfigjson` (`.dockerconfigjson` data key).
@@ -365,13 +400,18 @@ export const getSecretTypetoLabel = (obj: SecretKind) => {
   if (!obj) {
     return;
   }
-  const type = typeToLabel(obj.type);
-
-  const secretType =
-    type === SecretTypeDisplayLabel.keyValue && obj.data
-      ? `${type} (${Object.keys(obj.data).length})`
-      : type || '-';
-  return secretType;
+  const k8sType = inferSecretK8sTypeFromMetadata(obj);
+  const labelBase = typeToLabel(k8sType ?? '');
+  if (labelBase === SecretTypeDisplayLabel.keyValue && obj.data) {
+    return `${labelBase} (${Object.keys(obj.data).length})`;
+  }
+  if (labelBase) {
+    return labelBase;
+  }
+  if (obj.metadata?.labels?.[SecretByUILabel]) {
+    return SecretTypeDisplayLabel.keyValue;
+  }
+  return '-';
 };
 
 export const createSecretResource = async (

@@ -1,10 +1,13 @@
 import React from 'react';
-import { TextInputTypes } from '@patternfly/react-core';
+import { Button } from '@patternfly/react-core';
+import { EyeIcon } from '@patternfly/react-icons/dist/esm/icons/eye-icon';
 import { useField } from 'formik';
 import { InputField } from 'formik-pf';
 import DropdownField from '~/shared/components/formik-fields/DropdownField';
 import { SourceSecretType } from '~/types/secret';
 import EncodedFileUploadField from './EncodedFileUploadField';
+import { useSecretEditRevealOptional } from './secretEditRevealContext';
+import { SecretPasswordFormField } from './SecretPasswordFormField';
 
 type SourceSecretFormProps = {
   onAuthTypeChange?: (type: SourceSecretType) => void;
@@ -16,6 +19,7 @@ export const SourceSecretForm: React.FC<SourceSecretFormProps> = ({
   isEditMode = false,
 }) => {
   const [{ value: type }] = useField<SourceSecretType>('source.authType');
+  const revealCtx = useSecretEditRevealOptional();
 
   React.useEffect(() => {
     onAuthTypeChange?.(type);
@@ -49,28 +53,41 @@ export const SourceSecretForm: React.FC<SourceSecretFormProps> = ({
             label="Username"
             helperText="For Git authentication"
           />
-          <InputField
+          <SecretPasswordFormField
             name="source.password"
             data-test="secret-source-password"
             label="Password"
-            type={TextInputTypes.password}
             helperText="For Git authentication"
             placeholder={isEditMode ? 'To keep the same password, leave this field blank' : ''}
-            required={!isEditMode}
+            isRequired={!isEditMode}
           />
         </>
       ) : (
-        <EncodedFileUploadField
-          name="source.ssh-privatekey"
-          id="text-file-ssh"
-          label="SSH private key"
-          helpText={
-            isEditMode
-              ? 'If you want to keep the same SSH private key, leave this field blank'
-              : 'For Git authentication'
-          }
-          required={!isEditMode}
-        />
+        <>
+          {isEditMode && revealCtx && !revealCtx.hasFullSecret ? (
+            <div className="pf-v5-u-mb-md">
+              <Button
+                type="button"
+                variant="secondary"
+                icon={<EyeIcon />}
+                onClick={() => void revealCtx.ensureFullSecretLoaded()}
+              >
+                Reveal SSH private key to edit
+              </Button>
+            </div>
+          ) : null}
+          <EncodedFileUploadField
+            name="source.ssh-privatekey"
+            id="text-file-ssh"
+            label="SSH private key"
+            helpText={
+              isEditMode
+                ? 'If you want to keep the same SSH private key, leave this field blank'
+                : 'For Git authentication'
+            }
+            required={!isEditMode}
+          />
+        </>
       )}
     </>
   );

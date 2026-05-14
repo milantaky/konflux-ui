@@ -15,8 +15,10 @@ import {
   AddSecretFormValues,
   ImagePullSecretType,
   RemoteSecretStatusReason,
+  SecretByUILabel,
   SecretFor,
   SecretForComponentOption,
+  SecretKind,
   SecretLabels,
   SecretType,
   SecretTypeDropdownLabel,
@@ -42,6 +44,8 @@ import {
   typeToLabel,
   getSecretRowLabels,
   getSecretTypetoLabel,
+  inferSecretK8sTypeFromMetadata,
+  inferSecretTypeDropdown,
   patchCommonSecretLabel,
 } from '../secrets/secret-utils';
 
@@ -187,6 +191,73 @@ describe('getSecretTypetoLabel', () => {
 
   it('should return correct label for key', () => {
     expect(getSecretTypetoLabel(sampleOpaqueSecret)).toEqual('Key/value');
+  });
+
+  it('should infer display from scm credential label when type is omitted', () => {
+    const partial: SecretKind = {
+      apiVersion: 'v1',
+      kind: 'Secret',
+      metadata: {
+        name: 's',
+        namespace: 'n',
+        labels: {
+          [SecretLabels.CREDENTIAL_LABEL]: SecretLabels.CREDENTIAL_VALUE,
+        },
+      },
+    };
+    expect(getSecretTypetoLabel(partial)).toBe('Key/value');
+  });
+
+  it('should show generic key/value when only secret-for label is present', () => {
+    const partial: SecretKind = {
+      apiVersion: 'v1',
+      kind: 'Secret',
+      metadata: {
+        name: 's',
+        namespace: 'n',
+        labels: { [SecretByUILabel]: SecretFor.Build },
+      },
+    };
+    expect(getSecretTypetoLabel(partial)).toBe('Key/value');
+  });
+});
+
+describe('inferSecretK8sTypeFromMetadata', () => {
+  it('should prefer explicit type', () => {
+    expect(
+      inferSecretK8sTypeFromMetadata({
+        ...sampleOpaqueSecret,
+        type: SecretType.opaque,
+      } as SecretKind),
+    ).toBe(SecretType.opaque);
+  });
+
+  it('should infer basic auth from scm credential label', () => {
+    const s: SecretKind = {
+      apiVersion: 'v1',
+      kind: 'Secret',
+      metadata: {
+        name: 'x',
+        namespace: 'y',
+        labels: { [SecretLabels.CREDENTIAL_LABEL]: SecretLabels.CREDENTIAL_VALUE },
+      },
+    };
+    expect(inferSecretK8sTypeFromMetadata(s)).toBe(SecretType.basicAuth);
+  });
+});
+
+describe('inferSecretTypeDropdown', () => {
+  it('should map build label without type to opaque dropdown', () => {
+    const s: SecretKind = {
+      apiVersion: 'v1',
+      kind: 'Secret',
+      metadata: {
+        name: 'x',
+        namespace: 'y',
+        labels: { [SecretByUILabel]: SecretFor.Build },
+      },
+    };
+    expect(inferSecretTypeDropdown(s)).toBe(SecretTypeDropdownLabel.opaque);
   });
 });
 

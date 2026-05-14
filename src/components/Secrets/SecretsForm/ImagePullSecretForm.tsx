@@ -1,11 +1,20 @@
 import React from 'react';
-import { Alert, HelperText, HelperTextItem, Title, TitleSizes } from '@patternfly/react-core';
+import {
+  Alert,
+  Button,
+  HelperText,
+  HelperTextItem,
+  Title,
+  TitleSizes,
+} from '@patternfly/react-core';
+import { EyeIcon } from '@patternfly/react-icons/dist/esm/icons/eye-icon';
 import { useField } from 'formik';
 import { Base64 } from 'js-base64';
 import DropdownField from '../../../shared/components/formik-fields/DropdownField';
 import { ImagePullSecretType } from '../../../types';
 import EncodedFileUploadField from './EncodedFileUploadField';
 import { MultiImageCredentialForm } from './MultiImageCredentialForm';
+import { useSecretEditRevealOptional } from './secretEditRevealContext';
 
 type RegistryValidation = {
   registry: string;
@@ -28,6 +37,7 @@ export const ImagePullSecretForm: React.FC<React.PropsWithChildren<{ isEditMode?
   const [{ value: type }] = useField<ImagePullSecretType>('image.authType');
   const [registryValidations, setRegistryValidations] = React.useState<RegistryValidation[]>([]);
   const [fileTypeError, setFileTypeError] = React.useState<string>();
+  const revealCtx = useSecretEditRevealOptional();
 
   const validateDockerConfig = React.useCallback((decodedContent: string, filename?: string) => {
     // Handle empty input (e.g., file cleared)
@@ -75,6 +85,18 @@ export const ImagePullSecretForm: React.FC<React.PropsWithChildren<{ isEditMode?
 
   return (
     <>
+      {isEditMode && revealCtx && !revealCtx.hasFullSecret ? (
+        <div className="pf-v5-u-mb-md">
+          <Button
+            type="button"
+            variant="secondary"
+            icon={<EyeIcon />}
+            onClick={() => void revealCtx.ensureFullSecretLoaded()}
+          >
+            Reveal image pull data to edit
+          </Button>
+        </div>
+      ) : null}
       <DropdownField
         name="image.authType"
         label="Authentication type"

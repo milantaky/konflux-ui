@@ -1,3 +1,14 @@
+/** Accept header for GET a single Secret without `data` / `stringData` (metadata-only object). */
+export const K8S_SECRET_PARTIAL_OBJECT_METADATA_ACCEPT =
+  'application/json;as=PartialObjectMetadata;v=v1;g=meta.k8s.io';
+
+/**
+ * Accept header for **list** Secret requests. Lists must use `PartialObjectMetadataList`; using
+ * `PartialObjectMetadata` on a list returns 406 NotAcceptable from the API.
+ */
+export const K8S_SECRET_PARTIAL_OBJECT_METADATA_LIST_ACCEPT =
+  'application/json;as=PartialObjectMetadataList;v=v1;g=meta.k8s.io';
+
 export const FIELD_SECRET_FOR_COMPONENT_OPTION = 'secretForComponentOption';
 export const IMAGE_PULL_SECRET_TYPES = [
   'kubernetes.io/dockerconfigjson',
