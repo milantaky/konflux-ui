@@ -70,7 +70,14 @@ spec:
     # For pr-check: populated with e2e-tests/ when the PR changes that folder; left empty otherwise.
     # For periodic jobs: always empty — run-e2e uses the test image's baked-in /tmp/e2e sources.
     - name: e2e-source
-      description: 'Optional PR e2e test overlay (mounted at /e2e in run-e2e-konflux-ui)'
+      description: 'PR e2e test overlay (mounted at /e2e in run-e2e-konflux-ui); empty when e2e-tests/ unchanged'
+      volumeClaimTemplate:
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 1Gi
   tasks:
     - name: test-metadata
       taskRef:
@@ -260,6 +267,7 @@ spec:
               echo "Setup complete. Ready for E2E tests."
 
           # pr-check only: if there are any changes in e2e-tests/ folder, put PR sources into the workspace
+          # Containerfile changes are handled separately (KFLUXUI-1575).
           - name: prepare-e2e-sources
             when:
               - input: '$(params.job-type)'

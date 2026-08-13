@@ -135,7 +135,7 @@ spec:
         echo "=== Selecting E2E test sources ==="
         SPEC_FILE="$(params.spec-file)"
 
-        # pr-check may stage changed e2e-tests/ into the shared workspace (mounted at /e2e).
+        # prepare-e2e-resources may have staged changed e2e-tests/ into the workspace (mounted at /e2e).
         # Empty workspace → use image-baked sources at /tmp/e2e (no yarn install needed).
         # Non-empty workspace → install deps and run from /e2e (mirrors e2e-tests/entrypoint.sh).
         if [ -n "$(ls -A /e2e 2>/dev/null)" ]; then
@@ -169,7 +169,7 @@ spec:
         echo "=== Collecting test artifacts ==="
         mkdir -p /artifacts
 
-        # Copy Cypress artifacts if they exist
+        # Copy Cypress artifacts from whichever source tree was used for the run
         if [ -d "${E2E_DIR}/cypress/videos" ]; then
           echo "Copying videos..."
           cp -r "${E2E_DIR}/cypress/videos" /artifacts/ || true
