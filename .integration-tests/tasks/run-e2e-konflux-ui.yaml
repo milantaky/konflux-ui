@@ -42,10 +42,23 @@ spec:
       type: string
       default: ''
       description: 'Konflux base URL for Cypress tests (from prepare-e2e-resources pipeline task)'
-  workspaces:
-    # Populated by prepare-e2e-resources for pr-check when e2e-tests/ changed.
-    - name: e2e-source
-      description: 'PR e2e test overlay (empty = use image-baked sources at /tmp/e2e)'
+    - name: e2e-overlay-needed
+      type: string
+      default: 'false'
+      description: >-
+        When true (pr-check with e2e-tests/ changes), stage PR sources at /e2e before running tests.
+    - name: source-repo-url
+      type: string
+      default: ''
+      description: 'Git URL of the PR source repo, from test-metadata'
+    - name: git-revision
+      type: string
+      default: ''
+      description: 'PR head commit SHA, from test-metadata'
+    - name: target-branch
+      type: string
+      default: ''
+      description: 'PR target branch (e.g. main), from test-metadata'
   volumes:
     # Enlarge /dev/shm for Cypress/Chrome; default container shm (~64MB) causes flaky browser crashes
     - name: dshm
@@ -53,6 +66,8 @@ spec:
         medium: Memory
         sizeLimit: 3Gi
     - name: test-artifacts
+      emptyDir: {}
+    - name: e2e-overlay
       emptyDir: {}
     - name: oci-credentials
       secret:
@@ -66,6 +81,46 @@ spec:
       - name: test-artifacts
         mountPath: /artifacts
   steps:
+    - name: stage-e2e-overlay
+      when:
+        - input: '$(params.e2e-overlay-needed)'
+          operator: in
+          values: ['true']
+      image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
+      volumeMounts:
+        - name: e2e-overlay
+          mountPath: /e2e
+      env:
+        - name: GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: $(params.github-credentials-secret)
+              key: token
+              optional: true
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        REPO_URL="$(params.source-repo-url)"
+        GIT_REVISION="$(params.git-revision)"
+
+        echo "=== Staging PR e2e-tests/ sources at /e2e ==="
+        echo "Source repo: ${REPO_URL}"
+        echo "PR revision: ${GIT_REVISION}"
+
+        if [ -n "${GITHUB_TOKEN:-}" ]; then
+          git config --global http.extraheader "AUTHORIZATION: bearer ${GITHUB_TOKEN}"
+        fi
+
+        git init /tmp/repo
+        cd /tmp/repo
+        git remote add origin "${REPO_URL}"
+        git fetch origin "${GIT_REVISION}" --depth=1
+        git checkout "${GIT_REVISION}" -- e2e-tests/
+        cp -a e2e-tests/. /e2e/
+
+        echo "Staged $(find /e2e -type f | wc -l) files under /e2e"
+
     - name: run-e2e-test
       image: quay.io/konflux_ui_qe/konflux-ui-tests:$(params.test-image-tag)
       onError: continue
@@ -82,8 +137,7 @@ spec:
         # Chromium-based browsers (such as Cypress and Playwright) require /dev/shm for reliable operation inside containers.
         - name: dshm
           mountPath: /dev/shm
-      workspaces:
-        - name: e2e-source
+        - name: e2e-overlay
           mountPath: /e2e
       env:
         - name: CYPRESS_USERNAME
@@ -135,9 +189,8 @@ spec:
         echo "=== Selecting E2E test sources ==="
         SPEC_FILE="$(params.spec-file)"
 
-        # prepare-e2e-resources may have staged changed e2e-tests/ into the workspace (mounted at /e2e).
-        # Empty workspace → use image-baked sources at /tmp/e2e (no yarn install needed).
-        # Non-empty workspace → install deps and run from /e2e (mirrors e2e-tests/entrypoint.sh).
+        # prepare-e2e-resources sets e2e-overlay-needed when e2e-tests/ changed on pr-check.
+        # stage-e2e-overlay copies PR sources into /e2e when needed; otherwise /e2e stays empty.
         if [ -n "$(ls -A /e2e 2>/dev/null)" ]; then
           echo "PR e2e sources detected at /e2e — installing dependencies"
           cd /e2e
