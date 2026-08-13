@@ -42,6 +42,10 @@ spec:
       type: string
       default: ''
       description: 'Konflux base URL for Cypress tests (from prepare-e2e-resources pipeline task)'
+  workspaces:
+    # Populated by prepare-e2e-resources for pr-check when e2e-tests/ changed.
+    - name: e2e-source
+      description: 'PR e2e test overlay (empty = use image-baked sources at /tmp/e2e)'
   volumes:
     # Enlarge /dev/shm for Cypress/Chrome; default container shm (~64MB) causes flaky browser crashes
     - name: dshm
@@ -65,9 +69,7 @@ spec:
     - name: run-e2e-test
       image: quay.io/konflux_ui_qe/konflux-ui-tests:$(params.test-image-tag)
       onError: continue
-      workingDir: /tmp/e2e
-      # We should set the appropriate requests/limits based on our future observing
-      # Setting default values for memory and cpu by a guess
+      # workingDir is set dynamically in the script: /e2e when PR sources are staged, /tmp/e2e otherwise.
       computeResources:
         limits:
           memory: 8Gi
@@ -80,6 +82,9 @@ spec:
         # Chromium-based browsers (such as Cypress and Playwright) require /dev/shm for reliable operation inside containers.
         - name: dshm
           mountPath: /dev/shm
+      workspaces:
+        - name: e2e-source
+          mountPath: /e2e
       env:
         - name: CYPRESS_USERNAME
           valueFrom:
@@ -127,9 +132,26 @@ spec:
         fi
         echo "Konflux base URL: ${CYPRESS_KONFLUX_BASE_URL}"
 
-        echo "=== Running E2E tests ==="
+        echo "=== Selecting E2E test sources ==="
         SPEC_FILE="$(params.spec-file)"
 
+        # pr-check may stage changed e2e-tests/ into the shared workspace (mounted at /e2e).
+        # Empty workspace → use image-baked sources at /tmp/e2e (no yarn install needed).
+        # Non-empty workspace → install deps and run from /e2e (mirrors e2e-tests/entrypoint.sh).
+        if [ -n "$(ls -A /e2e 2>/dev/null)" ]; then
+          echo "PR e2e sources detected at /e2e — installing dependencies"
+          cd /e2e
+          yarn install --immutable
+          yarn cypress install
+          E2E_DIR=/e2e
+        else
+          echo "No PR e2e overlay — using image-baked sources at /tmp/e2e"
+          cd /tmp/e2e
+          E2E_DIR=/tmp/e2e
+        fi
+
+        echo "=== Running E2E tests ==="
+        echo "Working directory: ${E2E_DIR}"
         echo "Running test spec: ${SPEC_FILE}"
 
         # Run tests and capture exit code (don't exit on failure)
@@ -148,18 +170,18 @@ spec:
         mkdir -p /artifacts
 
         # Copy Cypress artifacts if they exist
-        if [ -d "cypress/videos" ]; then
+        if [ -d "${E2E_DIR}/cypress/videos" ]; then
           echo "Copying videos..."
-          cp -r cypress/videos /artifacts/ || true
+          cp -r "${E2E_DIR}/cypress/videos" /artifacts/ || true
         fi
 
-        if [ -d "cypress/screenshots" ]; then
+        if [ -d "${E2E_DIR}/cypress/screenshots" ]; then
           echo "Copying screenshots..."
-          cp -r cypress/screenshots /artifacts/ || true
+          cp -r "${E2E_DIR}/cypress/screenshots" /artifacts/ || true
         fi
 
         # Copy test reports
-        for f in cypress/junit-*.xml; do
+        for f in "${E2E_DIR}"/cypress/junit-*.xml; do
           if [ -f "$f" ]; then
             echo "Copying JUnit report: $f"
             cp "$f" /artifacts/ || true
@@ -170,6 +192,7 @@ spec:
         echo "Test execution completed with exit code: ${TEST_RESULT}" > /artifacts/e2e-tests.log
         echo "Timestamp: $(date)" >> /artifacts/e2e-tests.log
         echo "Base URL: ${CYPRESS_KONFLUX_BASE_URL}" >> /artifacts/e2e-tests.log
+        echo "E2E source: ${E2E_DIR}" >> /artifacts/e2e-tests.log
 
         # Save test result for later steps
         echo "${TEST_RESULT}" > /artifacts/test-exit-code
