@@ -65,19 +65,6 @@ spec:
         Repository is fixed so PipelineRuns cannot point the secret-bearing step at an arbitrary image.
       default: 'latest'
       type: string
-  workspaces:
-    # Shared between prepare-e2e-resources and run-e2e-konflux-ui.
-    # For pr-check: populated with e2e-tests/ when the PR changes that folder; left empty otherwise.
-    # For periodic jobs: always empty — run-e2e uses the test image's baked-in /tmp/e2e sources.
-    - name: e2e-source
-      description: 'PR e2e test overlay (mounted at /e2e in run-e2e-konflux-ui); empty when e2e-tests/ unchanged'
-      volumeClaimTemplate:
-        spec:
-          accessModes:
-            - ReadWriteOnce
-          resources:
-            requests:
-              storage: 1Gi
   tasks:
     - name: test-metadata
       taskRef:
@@ -179,16 +166,13 @@ spec:
           value: $(tasks.test-metadata.results.target-repo-branch)
         - name: github-credentials-secret
           value: $(params.github-credentials-secret)
-      workspaces:
-        - name: e2e-source
-          workspace: e2e-source
       taskSpec:
         description: >-
           Prepares resources required before running Konflux UI E2E tests.
           For periodic-local and pr-check jobs, extracts the Konflux base URL from the Kind cluster kubeconfig.
           For periodic-stage, emits an empty base-url result so downstream tasks can use their own URL selection.
-          For pr-check jobs, compares e2e-tests/ against the target branch and, when changed, copies the PR
-          version into the e2e-source workspace for run-e2e-konflux-ui to mount at /e2e.
+          For pr-check jobs, compares e2e-tests/ against the target branch and sets e2e-overlay-needed so
+          run-e2e-konflux-ui can stage PR sources when the folder changed.
         params:
           - name: job-type
             type: string
@@ -207,12 +191,12 @@ spec:
             type: string
             default: 'github-credentials'
             description: 'Secret containing a GitHub token for cloning private fork repos'
-        workspaces:
-          - name: e2e-source
-            description: 'Receives e2e-tests/ from the PR when that folder changed; stays empty otherwise'
         results:
           - name: base-url
             description: 'Konflux base URL for Cypress tests (https://<kind-ip>:9443)'
+          - name: e2e-overlay-needed
+            description: >-
+              Whether run-e2e-konflux-ui should stage PR e2e-tests/ sources (true when e2e-tests/ changed on pr-check).
         steps:
           - name: setup-base-url
             image: docker.io/bitnami/kubectl@sha256:95de17e6eb92da83a58c90a9df0c4cede634f898d2e6b92ea04f4a6ee6ace08d # kubectl 1.36.3
@@ -228,8 +212,11 @@ spec:
               if [ "$(params.job-type)" = "periodic-stage" ]; then
                 echo "Skipping Kind cluster setup for periodic-stage"
                 : > "$(results.base-url.path)"
+                echo -n "false" > "$(results.e2e-overlay-needed.path)"
                 exit 0
               fi
+
+              echo -n "false" > "$(results.e2e-overlay-needed.path)"
 
               echo "=== Getting PipelineRun name and kubeconfig ==="
 
@@ -266,7 +253,7 @@ spec:
 
               echo "Setup complete. Ready for E2E tests."
 
-          # pr-check only: if there are any changes in e2e-tests/ folder, put PR sources into the workspace
+          # pr-check only: detect e2e-tests/ changes vs target branch (staging happens in run-e2e-konflux-ui).
           # Containerfile changes are handled separately (KFLUXUI-1575).
           - name: prepare-e2e-sources
             when:
@@ -285,7 +272,6 @@ spec:
               #!/usr/bin/env bash
               set -euo pipefail
 
-              E2E_WS="$(workspaces.e2e-source.path)"
               REPO_URL="$(params.source-repo-url)"
               GIT_REVISION="$(params.git-revision)"
               TARGET_BRANCH="$(params.target-branch)"
@@ -294,7 +280,6 @@ spec:
               echo "Source repo: ${REPO_URL}"
               echo "PR revision: ${GIT_REVISION}"
               echo "Target branch: ${TARGET_BRANCH}"
-              echo "Workspace: ${E2E_WS}"
 
               # Authenticate git for private fork clones (public repos work without a token too).
               if [ -n "${GITHUB_TOKEN:-}" ]; then
@@ -307,15 +292,13 @@ spec:
               git fetch origin "${TARGET_BRANCH}" "${GIT_REVISION}" --depth=1
 
               if git diff --quiet "origin/${TARGET_BRANCH}" "${GIT_REVISION}" -- e2e-tests/; then
-                echo "No e2e-tests/ changes detected — workspace left empty (run-e2e will use image sources)"
+                echo "No e2e-tests/ changes detected — run-e2e will use image sources"
+                echo -n "false" > "$(results.e2e-overlay-needed.path)"
                 exit 0
               fi
 
-              echo "e2e-tests/ changed — copying PR version into shared workspace"
-              git checkout "${GIT_REVISION}" -- e2e-tests/
-              cp -a e2e-tests/. "${E2E_WS}/"
-
-              echo "Staged $(find "${E2E_WS}" -type f | wc -l) files under ${E2E_WS}"
+              echo "e2e-tests/ changed — run-e2e will stage PR sources"
+              echo -n "true" > "$(results.e2e-overlay-needed.path)"
 
     - name: monitor-webhook-logs
       runAfter:
@@ -369,9 +352,14 @@ spec:
           value: $(params.cypress-cloud-secret)
         - name: konflux-base-url
           value: $(tasks.prepare-e2e-resources.results.base-url)
-      workspaces:
-        - name: e2e-source
-          workspace: e2e-source
+        - name: e2e-overlay-needed
+          value: $(tasks.prepare-e2e-resources.results.e2e-overlay-needed)
+        - name: source-repo-url
+          value: $(tasks.test-metadata.results.source-repo-url)
+        - name: git-revision
+          value: $(tasks.test-metadata.results.git-revision)
+        - name: target-branch
+          value: $(tasks.test-metadata.results.target-repo-branch)
   finally:
     - name: deprovision-kind-cluster
       when:
