@@ -281,9 +281,11 @@ spec:
               echo "PR revision: ${GIT_REVISION}"
               echo "Target branch: ${TARGET_BRANCH}"
 
-              # Authenticate git for private fork clones (public repos work without a token too).
+              # GitHub HTTPS git ops need x-access-token in the URL (bearer extraheader does not work for fetch).
               if [ -n "${GITHUB_TOKEN:-}" ]; then
-                git config --global http.extraheader "AUTHORIZATION: bearer ${GITHUB_TOKEN}"
+                git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+              else
+                echo "WARNING: GITHUB_TOKEN is not set — git fetch may fail for private fork repos"
               fi
 
               git init /tmp/repo
