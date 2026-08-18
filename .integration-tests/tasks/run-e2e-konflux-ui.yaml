@@ -91,6 +91,8 @@ spec:
         - name: e2e-overlay
           mountPath: /e2e
       env:
+        - name: GIT_TERMINAL_PROMPT
+          value: '0'
         - name: GITHUB_TOKEN
           valueFrom:
             secretKeyRef:
@@ -112,15 +114,23 @@ spec:
         if [ -n "${GITHUB_TOKEN:-}" ]; then
           git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
         else
-          echo "WARNING: GITHUB_TOKEN is not set — git fetch may fail for private fork repos"
+          echo "ERROR: GITHUB_TOKEN is not set — cannot fetch private fork repos (check github-credentials secret)"
+          exit 1
         fi
 
+        git config --global init.defaultBranch main
         git init /tmp/repo
         cd /tmp/repo
         git remote add origin "${REPO_URL}"
-        git fetch origin "${GIT_REVISION}" --depth=1
+
+        echo "Fetching ${GIT_REVISION}..."
+        git fetch --depth=1 origin "${GIT_REVISION}"
+        echo "Fetch complete"
         git checkout "${GIT_REVISION}" -- e2e-tests/
         cp -a e2e-tests/. /e2e/
+
+        # run-e2e-test runs as non-root (OpenShift arbitrary UID); root-owned files block yarn install.
+        chmod -R a+rwX /e2e
 
         echo "Staged $(find /e2e -type f | wc -l) files under /e2e"
 
