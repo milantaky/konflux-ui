@@ -209,14 +209,13 @@ spec:
               #!/usr/bin/env bash
               set -euo pipefail
 
+              echo -n "false" > "$(results.e2e-overlay-needed.path)"
+
               if [ "$(params.job-type)" = "periodic-stage" ]; then
                 echo "Skipping Kind cluster setup for periodic-stage"
                 : > "$(results.base-url.path)"
-                echo -n "false" > "$(results.e2e-overlay-needed.path)"
                 exit 0
               fi
-
-              echo -n "false" > "$(results.e2e-overlay-needed.path)"
 
               echo "=== Getting PipelineRun name and kubeconfig ==="
 
@@ -284,13 +283,30 @@ spec:
               echo "PR revision: ${GIT_REVISION}"
               echo "Target branch: ${TARGET_BRANCH}"
 
-              # GitHub HTTPS git ops need x-access-token in the URL (bearer extraheader does not work for fetch).
-              if [ -n "${GITHUB_TOKEN:-}" ]; then
-                git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
-              else
+              # Use GIT_ASKPASS so the token is never embedded in remote URLs (avoids leaks in git errors).
+              if [ -z "${GITHUB_TOKEN:-}" ]; then
                 echo "ERROR: GITHUB_TOKEN is not set — cannot fetch private fork repos (check github-credentials secret)"
                 exit 1
               fi
+
+              ASKPASS="$(mktemp)"
+              chmod 700 "${ASKPASS}"
+              # Write askpass via printf (heredoc breaks prettier's YAML parser)
+              printf '%s\n' \
+                '#!/bin/sh' \
+                'case "$1" in' \
+                '  *Username*) printf "%s\n" "x-access-token" ;;' \
+                '  *Password*) printf "%s\n" "${GITHUB_TOKEN}" ;;' \
+                'esac' \
+                > "${ASKPASS}"
+              export GIT_ASKPASS="${ASKPASS}"
+              cleanup_askpass() {
+                if [ -n "${ASKPASS}" ] && [ -f "${ASKPASS}" ]; then
+                  rm -f "${ASKPASS}"
+                fi
+                unset GIT_ASKPASS
+              }
+              trap cleanup_askpass EXIT
 
               git config --global init.defaultBranch main
               git init /tmp/repo
