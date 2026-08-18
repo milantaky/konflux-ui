@@ -262,6 +262,8 @@ spec:
                 values: ['pr-check']
             image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
             env:
+              - name: GIT_TERMINAL_PROMPT
+                value: '0'
               - name: GITHUB_TOKEN
                 valueFrom:
                   secretKeyRef:
@@ -275,6 +277,7 @@ spec:
               REPO_URL="$(params.source-repo-url)"
               GIT_REVISION="$(params.git-revision)"
               TARGET_BRANCH="$(params.target-branch)"
+              TARGET_BRANCH="${TARGET_BRANCH#refs/heads/}"
 
               echo "=== Checking for e2e-tests/ changes (pr-check) ==="
               echo "Source repo: ${REPO_URL}"
@@ -285,13 +288,20 @@ spec:
               if [ -n "${GITHUB_TOKEN:-}" ]; then
                 git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
               else
-                echo "WARNING: GITHUB_TOKEN is not set — git fetch may fail for private fork repos"
+                echo "ERROR: GITHUB_TOKEN is not set — cannot fetch private fork repos (check github-credentials secret)"
+                exit 1
               fi
 
+              git config --global init.defaultBranch main
               git init /tmp/repo
               cd /tmp/repo
               git remote add origin "${REPO_URL}"
-              git fetch origin "${TARGET_BRANCH}" "${GIT_REVISION}" --depth=1
+
+              echo "Fetching origin/${TARGET_BRANCH} and ${GIT_REVISION}..."
+              git fetch --depth=1 origin \
+                "refs/heads/${TARGET_BRANCH}:refs/remotes/origin/${TARGET_BRANCH}" \
+                "${GIT_REVISION}"
+              echo "Fetch complete"
 
               if git diff --quiet "origin/${TARGET_BRANCH}" "${GIT_REVISION}" -- e2e-tests/; then
                 echo "No e2e-tests/ changes detected — run-e2e will use image sources"
