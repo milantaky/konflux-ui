@@ -158,45 +158,19 @@ spec:
       params:
         - name: job-type
           value: '$(params.job-type)'
-        - name: source-repo-url
-          value: $(tasks.test-metadata.results.source-repo-url)
-        - name: git-revision
-          value: $(tasks.test-metadata.results.git-revision)
-        - name: target-branch
-          value: $(tasks.test-metadata.results.target-repo-branch)
-        - name: github-credentials-secret
-          value: $(params.github-credentials-secret)
       taskSpec:
         description: >-
           Prepares resources required before running Konflux UI E2E tests.
           For periodic-local and pr-check jobs, extracts the Konflux base URL from the Kind cluster kubeconfig.
           For periodic-stage, emits an empty base-url result so downstream tasks can use their own URL selection.
-          For pr-check jobs, compares e2e-tests/ against the target branch and sets e2e-overlay-needed so
-          run-e2e-konflux-ui can stage PR sources when the folder changed.
         params:
           - name: job-type
             type: string
             default: 'pr-check'
             description: 'Type of job (pr-check, periodic-local, periodic-stage)'
-          - name: source-repo-url
-            type: string
-            description: 'Git URL of the PR source repo (fork or upstream), from test-metadata'
-          - name: git-revision
-            type: string
-            description: 'PR head commit SHA, from test-metadata'
-          - name: target-branch
-            type: string
-            description: 'PR target branch (e.g. main), from test-metadata'
-          - name: github-credentials-secret
-            type: string
-            default: 'github-credentials'
-            description: 'Secret containing a GitHub token for cloning private fork repos'
         results:
           - name: base-url
             description: 'Konflux base URL for Cypress tests (https://<kind-ip>:9443)'
-          - name: e2e-overlay-needed
-            description: >-
-              Whether run-e2e-konflux-ui should stage PR e2e-tests/ sources (true when e2e-tests/ changed on pr-check).
         steps:
           - name: setup-base-url
             image: docker.io/bitnami/kubectl@sha256:95de17e6eb92da83a58c90a9df0c4cede634f898d2e6b92ea04f4a6ee6ace08d # kubectl 1.36.3
@@ -208,8 +182,6 @@ spec:
             script: |
               #!/usr/bin/env bash
               set -euo pipefail
-
-              echo -n "false" > "$(results.e2e-overlay-needed.path)"
 
               if [ "$(params.job-type)" = "periodic-stage" ]; then
                 echo "Skipping Kind cluster setup for periodic-stage"
@@ -251,82 +223,6 @@ spec:
               echo -n "${CYPRESS_KONFLUX_BASE_URL}" > "$(results.base-url.path)"
 
               echo "Setup complete. Ready for E2E tests."
-
-          # pr-check only: detect e2e-tests/ changes vs target branch (staging happens in run-e2e-konflux-ui).
-          # Containerfile changes are handled separately (KFLUXUI-1575).
-          - name: prepare-e2e-sources
-            when:
-              - input: '$(params.job-type)'
-                operator: in
-                values: ['pr-check']
-            image: quay.io/konflux-qe-incubator/konflux-qe-tools:latest
-            env:
-              - name: GIT_TERMINAL_PROMPT
-                value: '0'
-              - name: GITHUB_TOKEN
-                valueFrom:
-                  secretKeyRef:
-                    name: $(params.github-credentials-secret)
-                    key: token
-                    optional: true
-            script: |
-              #!/usr/bin/env bash
-              set -euo pipefail
-
-              REPO_URL="$(params.source-repo-url)"
-              GIT_REVISION="$(params.git-revision)"
-              TARGET_BRANCH="$(params.target-branch)"
-              TARGET_BRANCH="${TARGET_BRANCH#refs/heads/}"
-
-              echo "=== Checking for e2e-tests/ changes (pr-check) ==="
-              echo "Source repo: ${REPO_URL}"
-              echo "PR revision: ${GIT_REVISION}"
-              echo "Target branch: ${TARGET_BRANCH}"
-
-              # Use GIT_ASKPASS so the token is never embedded in remote URLs (avoids leaks in git errors).
-              if [ -z "${GITHUB_TOKEN:-}" ]; then
-                echo "ERROR: GITHUB_TOKEN is not set — cannot fetch private fork repos (check github-credentials secret)"
-                exit 1
-              fi
-
-              ASKPASS="$(mktemp)"
-              chmod 700 "${ASKPASS}"
-              # Write askpass via printf (heredoc breaks prettier's YAML parser)
-              printf '%s\n' \
-                '#!/bin/sh' \
-                'case "$1" in' \
-                '  *Username*) printf "%s\n" "x-access-token" ;;' \
-                '  *Password*) printf "%s\n" "${GITHUB_TOKEN}" ;;' \
-                'esac' \
-                > "${ASKPASS}"
-              export GIT_ASKPASS="${ASKPASS}"
-              cleanup_askpass() {
-                if [ -n "${ASKPASS}" ] && [ -f "${ASKPASS}" ]; then
-                  rm -f "${ASKPASS}"
-                fi
-                unset GIT_ASKPASS
-              }
-              trap cleanup_askpass EXIT
-
-              git config --global init.defaultBranch main
-              git init /tmp/repo
-              cd /tmp/repo
-              git remote add origin "${REPO_URL}"
-
-              echo "Fetching origin/${TARGET_BRANCH} and ${GIT_REVISION}..."
-              git fetch --depth=1 origin \
-                "refs/heads/${TARGET_BRANCH}:refs/remotes/origin/${TARGET_BRANCH}" \
-                "${GIT_REVISION}"
-              echo "Fetch complete"
-
-              if git diff --quiet "origin/${TARGET_BRANCH}" "${GIT_REVISION}" -- e2e-tests/; then
-                echo "No e2e-tests/ changes detected — run-e2e will use image sources"
-                echo -n "false" > "$(results.e2e-overlay-needed.path)"
-                exit 0
-              fi
-
-              echo "e2e-tests/ changed — run-e2e will stage PR sources"
-              echo -n "true" > "$(results.e2e-overlay-needed.path)"
 
     - name: monitor-webhook-logs
       runAfter:
@@ -380,8 +276,6 @@ spec:
           value: $(params.cypress-cloud-secret)
         - name: konflux-base-url
           value: $(tasks.prepare-e2e-resources.results.base-url)
-        - name: e2e-overlay-needed
-          value: $(tasks.prepare-e2e-resources.results.e2e-overlay-needed)
         - name: source-repo-url
           value: $(tasks.test-metadata.results.source-repo-url)
         - name: git-revision
