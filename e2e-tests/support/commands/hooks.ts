@@ -20,6 +20,9 @@ Cypress.on('window:load', (win) => {
 });
 
 before(() => {
+  console.log('Konflux CI e2e overlay marker: feat/use-e2e-files');
+  cy.log('Konflux CI e2e overlay marker: feat/use-e2e-files');
+
   //Clear namespace before running the tests
   Common.cleanNamespace();
 
