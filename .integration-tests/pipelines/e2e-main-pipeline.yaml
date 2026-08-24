@@ -3,7 +3,7 @@ apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
   name: e2e-main-pipeline
-  namespace: konflux-ui-tenant
+  namespace: mtakac-tenant
 spec:
   params:
     - name: SNAPSHOT
@@ -237,9 +237,9 @@ spec:
         resolver: git
         params:
           - name: url
-            value: https://github.com/konflux-ci/konflux-ui
+            value: https://github.com/milantaky/konflux-ui
           - name: revision
-            value: main
+            value: feat/use-e2e-files
           - name: pathInRepo
             value: .integration-tests/tasks/monitor-webhook-logs.yaml
       params:
@@ -253,9 +253,9 @@ spec:
         resolver: git
         params:
           - name: url
-            value: https://github.com/konflux-ci/konflux-ui
+            value: https://github.com/milantaky/konflux-ui
           - name: revision
-            value: main
+            value: feat/use-e2e-files
           - name: pathInRepo
             value: .integration-tests/tasks/run-e2e-konflux-ui.yaml
       params:
@@ -285,7 +285,7 @@ spec:
         - name: target-branch
           value: $(tasks.test-metadata.results.target-repo-branch)
         - name: target-repo-url
-          value: https://github.com/$(tasks.test-metadata.results.git-org)/$(tasks.test-metadata.results.git-repo)
+          value: https://github.com/konflux-ci/konflux-ui
   finally:
     - name: deprovision-kind-cluster
       when:
@@ -318,7 +318,7 @@ spec:
     - name: pull-request-status-message
       when:
         - input: '$(params.job-type)'
-          operator: notin
+          operator: in
           values: ['periodic-stage', 'periodic-local']
       taskRef:
         resolver: git
@@ -354,9 +354,9 @@ spec:
         resolver: git
         params:
           - name: url
-            value: https://github.com/konflux-ci/konflux-ui
+            value: https://github.com/milantaky/konflux-ui
           - name: revision
-            value: main
+            value: feat/use-e2e-files
           - name: pathInRepo
             value: .integration-tests/tasks/send-slack-notification.yaml
       params:
