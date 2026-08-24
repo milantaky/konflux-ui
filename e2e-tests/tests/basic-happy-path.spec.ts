@@ -18,10 +18,6 @@ import { Features } from '../utils/Features';
 import { UIhelper } from '../utils/UIhelper';
 
 describe('Basic Happy Path', () => {
-  before(() => {
-    cy.log('Konflux CI e2e overlay marker: feat/use-e2e-files');
-  });
-
   const applicationName = Common.generateAppName();
   const applicationDetailPage = new ApplicationDetailPage();
   const integrationTestsTab = new IntegrationTestsTabPage();
