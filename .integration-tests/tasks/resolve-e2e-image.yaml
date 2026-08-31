@@ -112,13 +112,15 @@ spec:
         echo "Containerfile changed — staging e2e-tests/ for rebuild"
 
         if ! kubectl get imagestream "${IMAGESTREAM}" -n "${TEKTON_NAMESPACE}" >/dev/null 2>&1; then
-          echo "Creating ImageStream ${IMAGESTREAM} in ${TEKTON_NAMESPACE}"
-          kubectl create -f <(printf '%s\n' \
+          echo "ImageStream ${IMAGESTREAM} not found — attempting to create it"
+          if ! kubectl create -f <(printf '%s\n' \
             'apiVersion: image.openshift.io/v1' \
             'kind: ImageStream' \
             "metadata:" \
             "  name: ${IMAGESTREAM}" \
-            "  namespace: ${TEKTON_NAMESPACE}")
+            "  namespace: ${TEKTON_NAMESPACE}"); then
+            echo "WARNING: could not create ImageStream (cluster admin must create ${IMAGESTREAM} in ${TEKTON_NAMESPACE})"
+          fi
         fi
 
         git checkout "${GIT_REVISION}" -- e2e-tests/
