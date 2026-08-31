@@ -60,8 +60,8 @@ spec:
       type: string
     - name: test-image-tag
       description: >-
-        Tag for the E2E test image (quay.io/konflux_ui_qe/konflux-ui-tests:<tag>).
-        Repository is fixed so PipelineRuns cannot point the secret-bearing step at an arbitrary image.
+        Tag for the default E2E test image (quay.io/konflux_ui_qe/konflux-ui-tests:<tag>)
+        when the PR does not change e2e-tests/Containerfile.
       default: 'latest'
       type: string
   tasks:
@@ -78,6 +78,32 @@ spec:
       params:
         - name: SNAPSHOT
           value: $(params.SNAPSHOT)
+
+    - name: resolve-e2e-image
+      runAfter:
+        - test-metadata
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/konflux-ci/konflux-ui
+          - name: revision
+            value: main
+          - name: pathInRepo
+            value: .integration-tests/tasks/resolve-e2e-image.yaml
+      params:
+        - name: job-type
+          value: $(params.job-type)
+        - name: test-image-tag
+          value: $(params.test-image-tag)
+        - name: source-repo-url
+          value: $(tasks.test-metadata.results.source-repo-url)
+        - name: git-revision
+          value: $(tasks.test-metadata.results.git-revision)
+        - name: target-branch
+          value: $(tasks.test-metadata.results.target-repo-branch)
+        - name: target-repo-url
+          value: https://github.com/$(tasks.test-metadata.results.git-org)/$(tasks.test-metadata.results.git-repo)
 
     - name: provision-kind-cluster
       runAfter:
@@ -174,6 +200,7 @@ spec:
     - name: run-e2e-konflux-ui
       runAfter:
         - deploy-konflux
+        - resolve-e2e-image
       taskRef:
         resolver: git
         params:
@@ -191,8 +218,8 @@ spec:
           value: $(params.oci-container-repo):$(context.pipelineRun.name)
         - name: oci-credentials
           value: $(params.oci-credentials-secret)
-        - name: test-image-tag
-          value: $(params.test-image-tag)
+        - name: test-image
+          value: $(tasks.resolve-e2e-image.results.image-ref)
         - name: spec-file
           value: $(params.spec-file)
         - name: github-credentials-secret

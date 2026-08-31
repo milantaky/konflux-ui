@@ -1,0 +1,185 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: resolve-e2e-image
+  annotations:
+    tekton.dev/displayName: 'Resolve E2E test image'
+    tekton.dev/categories: 'Pipeline'
+    tekton.dev/tags: 'e2e,buildah,konflux-ui'
+spec:
+  description: >-
+    Always emits an image-ref for run-e2e-konflux-ui. For pr-check jobs, rebuilds
+    and pushes to the in-cluster registry when e2e-tests/Containerfile changed
+    versus the target branch. Otherwise writes the default
+    quay.io/konflux_ui_qe/konflux-ui-tests:<tag> reference.
+  params:
+    - name: job-type
+      type: string
+      default: 'pr-check'
+    - name: test-image-tag
+      type: string
+      default: 'latest'
+      description: 'Tag of the default quay.io/konflux_ui_qe/konflux-ui-tests image'
+    - name: source-repo-url
+      type: string
+      default: ''
+    - name: git-revision
+      type: string
+      default: ''
+    - name: target-branch
+      type: string
+      default: ''
+    - name: target-repo-url
+      type: string
+      default: ''
+  results:
+    - name: image-ref
+      description: 'Image pulled by run-e2e-konflux-ui (digest-pinned when rebuilt)'
+  volumes:
+    - name: e2e-src
+      emptyDir: {}
+  steps:
+    - name: detect-e2e-image
+      results:
+        - name: rebuilt
+          description: 'true when Containerfile changed and sources were staged'
+      image: quay.io/konflux-qe-incubator/konflux-qe-tools@sha256:88d70f9c61d2059e3a084fe6f2fb3ac341bc65efe9c6ba994e42a61bbb54fcba
+      env:
+        - name: GIT_TERMINAL_PROMPT
+          value: '0'
+        - name: TEKTON_NAMESPACE
+          value: $(context.taskRun.namespace)
+      volumeMounts:
+        - name: e2e-src
+          mountPath: /e2e-src
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        DEFAULT_IMAGE="quay.io/konflux_ui_qe/konflux-ui-tests:$(params.test-image-tag)"
+        INTERNAL_REGISTRY="image-registry.openshift-image-registry.svc:5000"
+        IMAGESTREAM="konflux-ui-e2e"
+        IMAGE_TAG_REF="${INTERNAL_REGISTRY}/${TEKTON_NAMESPACE}/${IMAGESTREAM}:$(context.pipelineRun.uid)"
+
+        write_default() {
+          echo "$1"
+          echo -n "${DEFAULT_IMAGE}" > "$(results.image-ref.path)"
+          echo -n "false" > "$(step.results.rebuilt.path)"
+        }
+
+        if [ "$(params.job-type)" != "pr-check" ]; then
+          write_default "job-type=$(params.job-type) — using default test image"
+          exit 0
+        fi
+
+        SOURCE_REPO_URL="$(params.source-repo-url)"
+        TARGET_REPO_URL="$(params.target-repo-url)"
+        GIT_REVISION="$(params.git-revision)"
+        TARGET_BRANCH="$(params.target-branch)"
+        TARGET_BRANCH="${TARGET_BRANCH#refs/heads/}"
+
+        if [ -z "${SOURCE_REPO_URL}" ] || [ -z "${GIT_REVISION}" ] || [ -z "${TARGET_BRANCH}" ] || [ -z "${TARGET_REPO_URL}" ]; then
+          write_default "Missing git metadata — using default test image"
+          exit 0
+        fi
+
+        echo "=== Checking Containerfile changes (pr-check) ==="
+        echo "Source repo: ${SOURCE_REPO_URL}"
+        echo "Target repo: ${TARGET_REPO_URL}"
+        echo "PR revision: ${GIT_REVISION}"
+        echo "Target branch: ${TARGET_BRANCH}"
+
+        git config --global init.defaultBranch main
+        git init /tmp/repo
+        cd /tmp/repo
+        git remote add origin "${SOURCE_REPO_URL}"
+        git remote add upstream "${TARGET_REPO_URL}"
+
+        echo "Fetching PR revision ${GIT_REVISION} from fork..."
+        git fetch --depth=1 origin "${GIT_REVISION}"
+        echo "Fetching upstream/${TARGET_BRANCH}..."
+        git fetch --depth=1 upstream \
+          "refs/heads/${TARGET_BRANCH}:refs/remotes/upstream/${TARGET_BRANCH}"
+
+        if git diff --quiet "upstream/${TARGET_BRANCH}" "${GIT_REVISION}" -- e2e-tests/Containerfile; then
+          write_default "No Containerfile changes — using default test image"
+          exit 0
+        fi
+
+        echo "Containerfile changed — staging e2e-tests/ for rebuild"
+        git checkout "${GIT_REVISION}" -- e2e-tests/
+        cp -a e2e-tests/. /e2e-src/
+        chmod -R a+rX /e2e-src
+        echo -n "${IMAGE_TAG_REF}" > /e2e-src/.image-tag-ref
+
+        echo -n "${IMAGE_TAG_REF}" > "$(results.image-ref.path)"
+        echo -n "true" > "$(step.results.rebuilt.path)"
+        echo "Will rebuild and push ${IMAGE_TAG_REF}"
+
+    - name: rebuild-and-push
+      when:
+        - input: '$(steps.detect-e2e-image.results.rebuilt)'
+          operator: in
+          values: ['true']
+      image: registry.access.redhat.com/ubi9/buildah@sha256:ef9c46b570264bc22c08e88864fae1be9e5a7d2738dbda409da747740f9e412a # ubi9/buildah 9.8
+      env:
+        - name: STORAGE_DRIVER
+          value: vfs
+        - name: BUILDAH_ISOLATION
+          value: chroot
+        - name: TEKTON_NAMESPACE
+          value: $(context.taskRun.namespace)
+      securityContext:
+        capabilities:
+          add:
+            - SETFCAP
+      computeResources:
+        limits:
+          memory: 8Gi
+          cpu: '2'
+        requests:
+          memory: 4Gi
+          cpu: '1'
+      volumeMounts:
+        - name: e2e-src
+          mountPath: /e2e-src
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        export HOME=/tmp
+        export XDG_RUNTIME_DIR=/tmp/run
+        mkdir -p "${XDG_RUNTIME_DIR}"
+
+        IMAGE_TAG_REF="$(cat /e2e-src/.image-tag-ref)"
+        REGISTRY="${IMAGE_TAG_REF%%/*}"
+
+        echo "=== Building E2E test image ==="
+        echo "Destination: ${IMAGE_TAG_REF}"
+
+        cd /e2e-src
+        buildah bud \
+          --isolation chroot \
+          -f Containerfile \
+          -t "${IMAGE_TAG_REF}" \
+          .
+
+        TOKEN="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
+        echo "${TOKEN}" | buildah login \
+          --tls-verify=false \
+          -u unused \
+          --password-stdin \
+          "${REGISTRY}"
+
+        echo "=== Pushing to in-cluster registry ==="
+        buildah push \
+          --tls-verify=false \
+          --digestfile /tmp/digest \
+          "${IMAGE_TAG_REF}" \
+          "docker://${IMAGE_TAG_REF}"
+
+        DIGEST="$(tr -d '[:space:]' < /tmp/digest)"
+        IMAGE_DIGEST_REF="${IMAGE_TAG_REF%:*}@${DIGEST}"
+
+        echo "Pushed ${IMAGE_DIGEST_REF}"
+        echo -n "${IMAGE_DIGEST_REF}" > "$(results.image-ref.path)"
