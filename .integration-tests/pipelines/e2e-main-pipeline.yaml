@@ -3,7 +3,7 @@ apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
   name: e2e-main-pipeline
-  namespace: konflux-ui-tenant
+  namespace: mtakac-tenant
 spec:
   params:
     - name: SNAPSHOT
@@ -60,8 +60,8 @@ spec:
       type: string
     - name: test-image-tag
       description: >-
-        Tag for the E2E test image (quay.io/konflux_ui_qe/konflux-ui-tests:<tag>).
-        Repository is fixed so PipelineRuns cannot point the secret-bearing step at an arbitrary image.
+        Tag for the default E2E test image (quay.io/konflux_ui_qe/konflux-ui-tests:<tag>)
+        when the PR does not change e2e-tests/Containerfile.
       default: 'latest'
       type: string
   tasks:
@@ -78,6 +78,34 @@ spec:
       params:
         - name: SNAPSHOT
           value: $(params.SNAPSHOT)
+
+    - name: resolve-e2e-image
+      runAfter:
+        - test-metadata
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/milantaky/konflux-ui
+          - name: revision
+            value: feat/docker-e2e-rebuild
+          - name: pathInRepo
+            value: .integration-tests/tasks/resolve-e2e-image.yaml
+      params:
+        - name: job-type
+          value: $(params.job-type)
+        - name: test-image-tag
+          value: $(params.test-image-tag)
+        - name: source-repo-url
+          value: $(tasks.test-metadata.results.source-repo-url)
+        - name: git-revision
+          value: $(tasks.test-metadata.results.git-revision)
+        - name: target-branch
+          value: main
+        - name: target-repo-url
+          value: https://github.com/konflux-ci/konflux-ui
+        - name: pipeline-run-uid
+          value: $(context.pipelineRun.uid)
 
     - name: provision-kind-cluster
       runAfter:
@@ -162,9 +190,9 @@ spec:
         resolver: git
         params:
           - name: url
-            value: https://github.com/konflux-ci/konflux-ui
+            value: https://github.com/milantaky/konflux-ui
           - name: revision
-            value: main
+            value: feat/docker-e2e-rebuild
           - name: pathInRepo
             value: .integration-tests/tasks/monitor-webhook-logs.yaml
       params:
@@ -174,13 +202,14 @@ spec:
     - name: run-e2e-konflux-ui
       runAfter:
         - deploy-konflux
+        - resolve-e2e-image
       taskRef:
         resolver: git
         params:
           - name: url
-            value: https://github.com/konflux-ci/konflux-ui
+            value: https://github.com/milantaky/konflux-ui
           - name: revision
-            value: main
+            value: feat/docker-e2e-rebuild
           - name: pathInRepo
             value: .integration-tests/tasks/run-e2e-konflux-ui.yaml
       params:
@@ -191,8 +220,8 @@ spec:
           value: $(params.oci-container-repo):$(context.pipelineRun.name)
         - name: oci-credentials
           value: $(params.oci-credentials-secret)
-        - name: test-image-tag
-          value: $(params.test-image-tag)
+        - name: test-image
+          value: $(tasks.resolve-e2e-image.results.image-ref)
         - name: spec-file
           value: $(params.spec-file)
         - name: github-credentials-secret
@@ -206,9 +235,9 @@ spec:
         - name: git-revision
           value: $(tasks.test-metadata.results.git-revision)
         - name: target-branch
-          value: $(tasks.test-metadata.results.target-repo-branch)
+          value: main
         - name: target-repo-url
-          value: https://github.com/$(tasks.test-metadata.results.git-org)/$(tasks.test-metadata.results.git-repo)
+          value: https://github.com/konflux-ci/konflux-ui
   finally:
     - name: deprovision-kind-cluster
       when:
@@ -277,9 +306,9 @@ spec:
         resolver: git
         params:
           - name: url
-            value: https://github.com/konflux-ci/konflux-ui
+            value: https://github.com/milantaky/konflux-ui
           - name: revision
-            value: main
+            value: feat/docker-e2e-rebuild
           - name: pathInRepo
             value: .integration-tests/tasks/send-slack-notification.yaml
       params:

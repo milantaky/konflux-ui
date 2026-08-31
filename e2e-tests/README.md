@@ -195,10 +195,21 @@ The test step executes `pr_check.sh` file which does the tests setup and runs te
 
 #### Konflux integration pipeline
 
-Konflux also runs E2E tests via the integration pipeline (`.integration-tests/pipelines/e2e-main-pipeline.yaml`) using the `run-e2e-konflux-ui` Tekton task. For `pr-check` jobs on **fork → upstream** PRs only, the task may overlay PR `e2e-tests/` sources:
+Konflux also runs E2E tests via the integration pipeline (`.integration-tests/pipelines/e2e-main-pipeline.yaml`) using the `run-e2e-konflux-ui` Tekton task.
+
+**Test image (`resolve-e2e-image`)** — Always runs after `test-metadata` (in parallel with Kind provision) and writes `image-ref` for `run-e2e-konflux-ui`. For `pr-check`, it diffs `e2e-tests/Containerfile` on the fork against the upstream target branch. If that file changed, it rebuilds with buildah, pushes to the in-cluster OpenShift registry (`<namespace>/konflux-ui-e2e`), and pins the digest. Otherwise it uses `quay.io/konflux_ui_qe/konflux-ui-tests:<tag>`. Rebuild failures show in `resolve-e2e-image` logs; Cypress failures show in `run-e2e-konflux-ui`. Before the first Containerfile rebuild in a tenant, a cluster admin must create the ImageStream and grant push access to the integration service account (e.g. `konflux-integration-runner`):
+
+```bash
+oc create imagestream konflux-ui-e2e -n <tenant-namespace>
+oc policy add-role-to-user system:image-builder \
+  system:serviceaccount:<tenant-namespace>:konflux-integration-runner \
+  -n <tenant-namespace>
+```
+
+**Test sources overlay** — For `pr-check` jobs on **fork → upstream** PRs only, `run-e2e-konflux-ui` may overlay PR `e2e-tests/` sources:
 
 1. **`prepare-e2e-sources` step** — Skipped for same-repo PRs (uses image-baked tests, like `pr_check.sh` on upstream). For fork → upstream PRs, fetches the PR commit from the fork and compares `e2e-tests/` against upstream `main`; stages changed files into `/e2e` when needed.
-2. **`run-e2e-test` step** — If `/e2e` contains staged sources, installs dependencies and runs Cypress from `/e2e`. Otherwise uses image-baked sources at `/tmp/e2e`.
+2. **`run-e2e-test` step** — If `/e2e` contains staged sources, installs dependencies and runs Cypress from `/e2e`. Otherwise uses image-baked sources at `/tmp/e2e`. The step image is `$(params.test-image)` from `resolve-e2e-image`.
 
 The container entrypoint performs a similar `/e2e` vs `/tmp/e2e` check for manual runs only.
 
