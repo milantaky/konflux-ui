@@ -101,7 +101,7 @@ spec:
         - name: git-revision
           value: $(tasks.test-metadata.results.git-revision)
         - name: target-branch
-          value: $(tasks.test-metadata.results.target-repo-branch)
+          value: main
         - name: target-repo-url
           value: https://github.com/konflux-ci/konflux-ui
         - name: pipeline-run-uid
@@ -235,7 +235,7 @@ spec:
         - name: git-revision
           value: $(tasks.test-metadata.results.git-revision)
         - name: target-branch
-          value: $(tasks.test-metadata.results.target-repo-branch)
+          value: main
         - name: target-repo-url
           value: https://github.com/konflux-ci/konflux-ui
   finally:
