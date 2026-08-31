@@ -197,7 +197,14 @@ The test step executes `pr_check.sh` file which does the tests setup and runs te
 
 Konflux also runs E2E tests via the integration pipeline (`.integration-tests/pipelines/e2e-main-pipeline.yaml`) using the `run-e2e-konflux-ui` Tekton task.
 
-**Test image (`resolve-e2e-image`)** — Always runs after `test-metadata` (in parallel with Kind provision) and writes `image-ref` for `run-e2e-konflux-ui`. For `pr-check`, it diffs `e2e-tests/Containerfile` on the fork against the upstream target branch. If that file changed, it rebuilds with buildah, pushes to the in-cluster OpenShift registry (`<namespace>/konflux-ui-e2e`), and pins the digest. Otherwise it uses `quay.io/konflux_ui_qe/konflux-ui-tests:<tag>`. Rebuild failures show in `resolve-e2e-image` logs; Cypress failures show in `run-e2e-konflux-ui`. The tenant namespace needs an `ImageStream` named `konflux-ui-e2e` (created automatically on first rebuild) and the integration pipeline service account needs `system:image-builder` in that namespace.
+**Test image (`resolve-e2e-image`)** — Always runs after `test-metadata` (in parallel with Kind provision) and writes `image-ref` for `run-e2e-konflux-ui`. For `pr-check`, it diffs `e2e-tests/Containerfile` on the fork against the upstream target branch. If that file changed, it rebuilds with buildah, pushes to the in-cluster OpenShift registry (`<namespace>/konflux-ui-e2e`), and pins the digest. Otherwise it uses `quay.io/konflux_ui_qe/konflux-ui-tests:<tag>`. Rebuild failures show in `resolve-e2e-image` logs; Cypress failures show in `run-e2e-konflux-ui`. Before the first Containerfile rebuild in a tenant, a cluster admin must create the ImageStream and grant push access to the integration service account (e.g. `konflux-integration-runner`):
+
+```bash
+oc create imagestream konflux-ui-e2e -n <tenant-namespace>
+oc policy add-role-to-user system:image-builder \
+  system:serviceaccount:<tenant-namespace>:konflux-integration-runner \
+  -n <tenant-namespace>
+```
 
 **Test sources overlay** — For `pr-check` jobs on **fork → upstream** PRs only, `run-e2e-konflux-ui` may overlay PR `e2e-tests/` sources:
 
