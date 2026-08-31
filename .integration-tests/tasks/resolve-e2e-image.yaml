@@ -110,6 +110,17 @@ spec:
         fi
 
         echo "Containerfile changed — staging e2e-tests/ for rebuild"
+
+        if ! kubectl get imagestream "${IMAGESTREAM}" -n "${TEKTON_NAMESPACE}" >/dev/null 2>&1; then
+          echo "Creating ImageStream ${IMAGESTREAM} in ${TEKTON_NAMESPACE}"
+          kubectl create -f <(printf '%s\n' \
+            'apiVersion: image.openshift.io/v1' \
+            'kind: ImageStream' \
+            "metadata:" \
+            "  name: ${IMAGESTREAM}" \
+            "  namespace: ${TEKTON_NAMESPACE}")
+        fi
+
         git checkout "${GIT_REVISION}" -- e2e-tests/
         cp -a e2e-tests/. /e2e-src/
         chmod -R a+rX /e2e-src
@@ -168,15 +179,14 @@ spec:
           .
 
         TOKEN="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
-        echo "${TOKEN}" | buildah login \
-          --tls-verify=false \
-          -u unused \
-          --password-stdin \
-          "${REGISTRY}"
+        AUTHFILE=/tmp/registry-auth.json
+        AUTH_B64="$(printf 'unused:%s' "${TOKEN}" | base64 | tr -d '\n')"
+        printf '{"auths":{"%s":{"auth":"%s"}}}\n' "${REGISTRY}" "${AUTH_B64}" > "${AUTHFILE}"
 
         echo "=== Pushing to in-cluster registry ==="
         buildah push \
           --tls-verify=false \
+          --authfile "${AUTHFILE}" \
           --digestfile /tmp/digest \
           "${IMAGE_TAG_REF}" \
           "docker://${IMAGE_TAG_REF}"
