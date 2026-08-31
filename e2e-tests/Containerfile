@@ -7,6 +7,7 @@ RUN wget "https://github.com/sigstore/cosign/releases/download/v3.0.4/cosign-lin
     mv cosign-linux-amd64 /usr/local/bin/cosign && \
     chmod +x /usr/local/bin/cosign
 
+# THIS IS A CHANGE, PLS REBUILD THE IMAGE
 
 USER node:0
 
