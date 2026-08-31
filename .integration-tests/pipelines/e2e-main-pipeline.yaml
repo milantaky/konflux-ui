@@ -88,7 +88,7 @@ spec:
           - name: url
             value: https://github.com/milantaky/konflux-ui
           - name: revision
-            value: feat/docker-e2e-rebuild
+            value: test-dcket
           - name: pathInRepo
             value: .integration-tests/tasks/resolve-e2e-image.yaml
       params:
@@ -192,7 +192,7 @@ spec:
           - name: url
             value: https://github.com/milantaky/konflux-ui
           - name: revision
-            value: feat/docker-e2e-rebuild
+            value: test-dcket
           - name: pathInRepo
             value: .integration-tests/tasks/monitor-webhook-logs.yaml
       params:
@@ -209,7 +209,7 @@ spec:
           - name: url
             value: https://github.com/milantaky/konflux-ui
           - name: revision
-            value: feat/docker-e2e-rebuild
+            value: test-dcket
           - name: pathInRepo
             value: .integration-tests/tasks/run-e2e-konflux-ui.yaml
       params:
@@ -308,7 +308,7 @@ spec:
           - name: url
             value: https://github.com/milantaky/konflux-ui
           - name: revision
-            value: feat/docker-e2e-rebuild
+            value: test-dcket
           - name: pathInRepo
             value: .integration-tests/tasks/send-slack-notification.yaml
       params:
