@@ -32,6 +32,9 @@ spec:
     - name: target-repo-url
       type: string
       default: ''
+    - name: pipeline-run-uid
+      type: string
+      description: 'PipelineRun UID used as the in-cluster image tag'
   results:
     - name: image-ref
       description: 'Image pulled by run-e2e-konflux-ui (digest-pinned when rebuilt)'
@@ -59,7 +62,7 @@ spec:
         DEFAULT_IMAGE="quay.io/konflux_ui_qe/konflux-ui-tests:$(params.test-image-tag)"
         INTERNAL_REGISTRY="image-registry.openshift-image-registry.svc:5000"
         IMAGESTREAM="konflux-ui-e2e"
-        IMAGE_TAG_REF="${INTERNAL_REGISTRY}/${TEKTON_NAMESPACE}/${IMAGESTREAM}:$(context.pipelineRun.uid)"
+        IMAGE_TAG_REF="${INTERNAL_REGISTRY}/${TEKTON_NAMESPACE}/${IMAGESTREAM}:$(params.pipeline-run-uid)"
 
         write_default() {
           echo "$1"
