@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/nodejs-24@sha256:72d0d539b02fb150e1a11889816f2c5b197f802dd398c7ac86409d9ef035d290 AS builder
+FROM registry.access.redhat.com/ubi9/nodejs-24@sha256:8feecc79fd5e66134b5b71ebba38bd117f4527ee13c8748e8ff38e8b698eb6eb AS builder
 
 # Run as root in builder stage (final image uses non-root USER 1001)
 USER 0
