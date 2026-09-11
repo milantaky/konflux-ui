@@ -91,7 +91,7 @@ The `e2e-tests` folder contains two Containerfiles used mainly for the test auto
 
 Image is pushed to quay.io https://quay.io/repository/konflux_ui_qe/konflux-ui-tests-base by [GitHub Action](https://github.com/konflux-ci/konflux-ui/blob/main/.github/workflows/base-test-image.yaml).
 
-**Containerfile** is based on BaseContainerfile and contains some additional dependencies such as kubectl or cosign. It contains files from the `e2e-tests` folder so tests can be run directly from the image. It is available on quay.io https://quay.io/repository/konflux_ui_qe/konflux-ui-tests and should be updated by [GitHub Action](https://github.com/konflux-ci/konflux-ui/blob/main/.github/workflows/post-merge.yaml#L47) once PR is merged to main.
+**Containerfile** is based on BaseContainerfile and contains some additional dependencies such as kubectl or cosign. It contains files from the `e2e-tests` folder so tests can be run directly from the image. Konflux builds the test image in parallel with the UI image via the `ui` component pipeline (`.tekton/ui-*.yaml`), tagged `on-pr-<sha>` on pull requests and `<sha>` on push. It is also available on quay.io https://quay.io/repository/konflux_ui_qe/konflux-ui-tests and should be updated by [GitHub Action](https://github.com/konflux-ci/konflux-ui/blob/main/.github/workflows/post-merge.yaml#L47) once PR is merged to main.
 
 If there are no changes in your local test code, you can pull and run the image from quay, providing the required environment variables. Feel free to use docker or podman, we will be using podman in this example:
 
@@ -195,7 +195,7 @@ The test step executes `pr_check.sh` file which does the tests setup and runs te
 
 #### Konflux integration pipeline
 
-Konflux also runs E2E tests via the integration pipeline (`.integration-tests/pipelines/e2e-main-pipeline.yaml`) using the `run-e2e-konflux-ui` Tekton task. For `pr-check` jobs on **fork → upstream** PRs only, the task may overlay PR `e2e-tests/` sources:
+Konflux also runs E2E tests via the integration pipeline (`.integration-tests/pipelines/e2e-main-pipeline.yaml`) using the `run-e2e-konflux-ui` Tekton task. The test runner image is built in parallel with the UI image by the `ui` component build pipeline (tag `on-pr-<sha>` for PRs) and referenced directly by that tag in IT. For `pr-check` jobs on **fork → upstream** PRs only, the task may overlay PR `e2e-tests/` sources:
 
 1. **`prepare-e2e-sources` step** — Skipped for same-repo PRs (uses image-baked tests, like `pr_check.sh` on upstream). For fork → upstream PRs, fetches the PR commit from the fork and compares `e2e-tests/` against upstream `main`; stages changed files into `/e2e` when needed.
 2. **`run-e2e-test` step** — If `/e2e` contains staged sources, installs dependencies and runs Cypress from `/e2e`. Otherwise uses image-baked sources at `/tmp/e2e`.

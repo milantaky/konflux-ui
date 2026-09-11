@@ -25,6 +25,14 @@ spec:
     value: quay.io/redhat-user-workloads-stage/mtakac-tenant/ui:{{revision}}
   - name: dockerfile
     value: Dockerfile
+  - name: e2e-output-image
+    value: quay.io/redhat-user-workloads-stage/mtakac-tenant/konflux-ui-tests:{{revision}}
+  - name: e2e-dockerfile
+    value: Containerfile
+  - name: e2e-path-context
+    value: e2e-tests
+  - name: e2e-prefetch-input
+    value: '{"type": "yarn", "path": "e2e-tests"}'
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
@@ -51,6 +59,21 @@ spec:
       description: Path to the Dockerfile inside the context specified by parameter
         path-context
       name: dockerfile
+      type: string
+    - description: Fully qualified output image for the E2E test runner
+      name: e2e-output-image
+      type: string
+    - default: Containerfile
+      description: Path to the E2E Containerfile inside e2e-path-context
+      name: e2e-dockerfile
+      type: string
+    - default: e2e-tests
+      description: Build context for the E2E test runner image
+      name: e2e-path-context
+      type: string
+    - default: ""
+      description: Cachi2 prefetch input for the E2E test runner image
+      name: e2e-prefetch-input
       type: string
     - default: "false"
       description: Skip checks against built image
@@ -130,6 +153,12 @@ spec:
       name: IMAGE_DIGEST
       value: $(tasks.build-image-index.results.IMAGE_DIGEST)
     - description: ""
+      name: E2E_IMAGE_URL
+      value: $(tasks.build-e2e-container.results.IMAGE_URL)
+    - description: ""
+      name: E2E_IMAGE_DIGEST
+      value: $(tasks.build-e2e-container.results.IMAGE_DIGEST)
+    - description: ""
       name: CHAINS-GIT_URL
       value: $(tasks.clone-repository.results.url)
     - description: ""
@@ -201,6 +230,34 @@ spec:
         workspace: git-auth
       - name: netrc
         workspace: netrc
+    - name: prefetch-e2e-dependencies
+      params:
+      - name: input
+        value: $(params.e2e-prefetch-input)
+      - name: enable-package-registry-proxy
+        value: $(params.enable-package-registry-proxy)
+      - name: SOURCE_ARTIFACT
+        value: $(tasks.clone-repository.results.SOURCE_ARTIFACT)
+      - name: ociStorage
+        value: $(params.e2e-output-image).prefetch
+      - name: ociArtifactExpiresAfter
+        value: $(params.image-expires-after)
+      runAfter:
+      - clone-repository
+      taskRef:
+        params:
+        - name: name
+          value: prefetch-dependencies-oci-ta
+        - name: bundle
+          value: quay.io/konflux-ci/tekton-catalog/task-prefetch-dependencies-oci-ta:0.10.1@sha256:c09c1c3ced67fb8740b2925a7de09c0810d4e8c8f148d41c21ffe37810d85c62
+        - name: kind
+          value: task
+        resolver: bundles
+      workspaces:
+      - name: git-basic-auth
+        workspace: git-auth
+      - name: netrc
+        workspace: netrc
     - name: build-container
       params:
       - name: IMAGE
@@ -253,6 +310,58 @@ spec:
         - name: kind
           value: task
         resolver: bundles
+    - name: build-e2e-container
+      params:
+      - name: IMAGE
+        value: $(params.e2e-output-image)
+      - name: DOCKERFILE
+        value: $(params.e2e-dockerfile)
+      - name: CONTEXT
+        value: $(params.e2e-path-context)
+      - name: HERMETIC
+        value: "false"
+      - name: PREFETCH_INPUT
+        value: $(params.e2e-prefetch-input)
+      - name: IMAGE_EXPIRES_AFTER
+        value: $(params.image-expires-after)
+      - name: COMMIT_SHA
+        value: $(tasks.clone-repository.results.commit)
+      - name: BUILD_ARGS
+        value:
+        - $(params.build-args[*])
+      - name: BUILD_ARGS_FILE
+        value: $(params.build-args-file)
+      - name: PRIVILEGED_NESTED
+        value: $(params.privileged-nested)
+      - name: SOURCE_URL
+        value: $(tasks.clone-repository.results.url)
+      - name: BUILDAH_FORMAT
+        value: $(params.buildah-format)
+      - name: HTTP_PROXY
+        value: $(tasks.init.results.http-proxy)
+      - name: NO_PROXY
+        value: $(tasks.init.results.no-proxy)
+      - name: SOURCE_DATE_EPOCH
+        value: $(params.source-date-epoch)
+      - name: REWRITE_TIMESTAMP
+        value: $(params.rewrite-timestamp)
+      - name: OMIT_HISTORY
+        value: $(params.omit-history)
+      - name: SOURCE_ARTIFACT
+        value: $(tasks.prefetch-e2e-dependencies.results.SOURCE_ARTIFACT)
+      - name: CACHI2_ARTIFACT
+        value: $(tasks.prefetch-e2e-dependencies.results.CACHI2_ARTIFACT)
+      runAfter:
+      - prefetch-e2e-dependencies
+      taskRef:
+        params:
+        - name: name
+          value: buildah-oci-ta
+        - name: bundle
+          value: quay.io/konflux-ci/tekton-catalog/task-buildah-oci-ta:0.10.5@sha256:5fcf620537b0dece56a9c9a8090ce7592a874da92cc2a5d398abdc2382eb8a3c
+        - name: kind
+          value: task
+        resolver: bundles
     - name: build-image-index
       params:
       - name: IMAGE
@@ -272,6 +381,23 @@ spec:
           value: build-image-index
         - name: bundle
           value: quay.io/konflux-ci/tekton-catalog/task-build-image-index:0.3.1@sha256:cc75f64deecccb1b59e96ac1182665a5342d79c9e22eebff63d26b0f00a4319c
+        - name: kind
+          value: task
+        resolver: bundles
+    - name: apply-tags-e2e
+      params:
+      - name: IMAGE_URL
+        value: $(tasks.build-e2e-container.results.IMAGE_URL)
+      - name: IMAGE_DIGEST
+        value: $(tasks.build-e2e-container.results.IMAGE_DIGEST)
+      runAfter:
+      - build-e2e-container
+      taskRef:
+        params:
+        - name: name
+          value: apply-tags
+        - name: bundle
+          value: quay.io/konflux-ci/tekton-catalog/task-apply-tags:0.3@sha256:3ab844157eccd68e95e4852adc06c3c4ea674edb7865a474b0a898227f2893d6
         - name: kind
           value: task
         resolver: bundles
