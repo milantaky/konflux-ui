@@ -61,8 +61,8 @@ spec:
     - name: test-image-repository
       description: >-
         E2E test image repository without tag. Must match e2e-output-image from
-        the ui build pipeline; IT appends on-pr-<sha> for pr-check jobs.
-      default: 'quay.io/redhat-user-workloads-stage/mtakac-tenant/konflux-ui-tests'
+        the ui build pipeline; IT appends e2e-on-pr-<sha> for pr-check jobs.
+      default: 'quay.io/redhat-user-workloads-stage/mtakac-tenant/ui'
       type: string
   tasks:
     - name: test-metadata
@@ -192,7 +192,7 @@ spec:
         - name: oci-credentials
           value: $(params.oci-credentials-secret)
         - name: test-image
-          value: $(params.test-image-repository):on-pr-$(tasks.test-metadata.results.git-revision)
+          value: $(params.test-image-repository):e2e-on-pr-$(tasks.test-metadata.results.git-revision)
         - name: spec-file
           value: $(params.spec-file)
         - name: github-credentials-secret
