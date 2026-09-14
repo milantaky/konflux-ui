@@ -53,6 +53,9 @@ spec:
       type: string
       default: ''
       description: 'Upstream Git URL (git-org/git-repo). Required for fork -> upstream PR overlay.'
+    - name: pipeline-run-name
+      type: string
+      description: 'Integration pipeline run name; used to locate the Kind kubeconfig secret.'
   volumes:
     # Enlarge /dev/shm for Cypress/Chrome; default container shm (~64MB) causes flaky browser crashes
     - name: dshm
@@ -97,7 +100,7 @@ spec:
 
         echo "=== Getting PipelineRun name and kubeconfig ==="
 
-        PIPELINE_RUN_NAME="$(context.pipelineRun.name)"
+        PIPELINE_RUN_NAME="$(params.pipeline-run-name)"
         NAMESPACE="${TEKTON_NAMESPACE}"
         echo "PipelineRun name: ${PIPELINE_RUN_NAME}"
         echo "Namespace: ${NAMESPACE}"

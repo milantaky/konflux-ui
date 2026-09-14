@@ -249,6 +249,8 @@ spec:
           value: $(tasks.test-metadata.results.target-repo-branch)
         - name: target-repo-url
           value: https://github.com/$(tasks.test-metadata.results.git-org)/$(tasks.test-metadata.results.git-repo)
+        - name: pipeline-run-name
+          value: $(context.pipelineRun.name)
   finally:
     - name: deprovision-kind-cluster
       when:
