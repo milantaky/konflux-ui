@@ -202,6 +202,42 @@ Konflux also runs E2E tests via the integration pipeline (`.integration-tests/pi
 
 The container entrypoint performs a similar `/e2e` vs `/tmp/e2e` check for manual runs only.
 
+##### Verifying the rebuilt test image is used
+
+Search logs for the prefix **`[KONFLUX-E2E-IMAGE]`**.
+
+**1. Image was rebuilt (ui component build PipelineRun)**
+
+Konflux UI → Application `docker-test` → Component `ui` → **Activity** → latest `ui-on-push` or `ui-on-pull-request` PipelineRun:
+
+| Where                                                 | What to look for                                      |
+| ----------------------------------------------------- | ----------------------------------------------------- |
+| Task **`build-e2e-container`** → logs → **STEP-PUSH** | `Pushed .../ui:e2e-<sha>` or `.../ui:e2e-on-pr-<sha>` |
+| PipelineRun **Results** (bottom of run page)          | `E2E_IMAGE_URL` and `E2E_IMAGE_DIGEST`                |
+
+**2. IT selected the matching tag (integration test PipelineRun)**
+
+Konflux UI → Application `docker-test` → **Integration tests** → `rebuilt-e2e-it` → latest PipelineRun:
+
+| Task                        | Step              | Log lines                                                       |
+| --------------------------- | ----------------- | --------------------------------------------------------------- |
+| **`format-e2e-test-image`** | STEP-FORMAT       | `[KONFLUX-E2E-IMAGE] Pull spec: quay.io/.../ui:e2e-...`         |
+| **`run-e2e-konflux-ui`**    | STEP-RUN-E2E-TEST | `[KONFLUX-E2E-IMAGE] Pull spec:` (must match step 1 tag)        |
+| **`run-e2e-konflux-ui`**    | STEP-RUN-E2E-TEST | `No PR e2e overlay — using image-baked sources` (same-repo PRs) |
+
+The git `<sha>` in both PipelineRuns should match, and the pull spec in IT should match `E2E_IMAGE_URL` from the build (tag may differ by `@digest` vs `:tag`, same digest is ideal).
+
+**3. CLI alternative**
+
+```bash
+# Build produced e2e image
+kubectl get pipelinerun -n mtakac-tenant -l appstudio.openshift.io/component=ui \
+  -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.results[?(@.name=="E2E_IMAGE_URL")].value}{"\n"}{end}'
+
+# IT resolved pull spec (from task log)
+# Open run-e2e-konflux-ui pod logs and grep KONFLUX-E2E-IMAGE
+```
+
 ### Periodic tests
 
 Periodic tests are not in place yet.
