@@ -657,7 +657,7 @@ spec:
       - name: netrc
         optional: true
   taskRunTemplate:
-    serviceAccountName: build-pipeline-ui
+    serviceAccountName: build-pipeline-delete
   workspaces:
     - name: git-auth
       secret:
