@@ -3,13 +3,13 @@ apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
   name: e2e-main-pipeline
-  namespace: konflux-ui-tenant
+  namespace: mtakac-tenant
 spec:
   params:
     - name: SNAPSHOT
       description: 'The JSON string representing the snapshot of the application under test.'
       # Should there be test image or UI builded image? Or are there both? Where to find out?
-      default: '{"components": [{"name":"konflux-ui", "containerImage": "quay.io/konflux_ui_qe/konflux-ui-tests:latest"}]}'
+      default: '{"components": [{"name":"ui", "containerImage": "quay.io/redhat-user-workloads-stage/mtakac-tenant/ui:on-pr-latest"}]}'
       type: string
     - name: konflux-test-infra-secret
       description: The name of secret where testing infrastructures credentials are stored.
@@ -61,8 +61,8 @@ spec:
     - name: test-image-repository
       description: >-
         E2E test image repository without tag. Must match e2e-output-image from
-        the konflux-ui build pipeline (e2e-on-pr-<sha> for pull_request, e2e-<sha> for push).
-      default: 'quay.io/redhat-user-workloads/konflux-ui-tenant/konflux-ui/konflux-ui'
+        the ui build pipeline (e2e-on-pr-<sha> for pull_request, e2e-<sha> for push).
+      default: 'quay.io/redhat-user-workloads-stage/mtakac-tenant/ui'
       type: string
   tasks:
     - name: test-metadata
@@ -103,7 +103,7 @@ spec:
         - name: cluster-access-secret-name
           value: kfg-$(context.pipelineRun.name)
         - name: tags
-          value: 'owner=konflux-ui@redhat.com,project=Konflux,created-by=integration-pipeline,component=konflux-ui'
+          value: 'owner=konflux-ui@redhat.com,project=Konflux,created-by=integration-pipeline,component=ui'
         - name: ownerName
           value: $(context.pipelineRun.name)
         - name: ownerUid
