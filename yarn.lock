@@ -1950,8 +1950,8 @@ __metadata:
   linkType: hard
 
 "@dotenvx/dotenvx@npm:^2.0.0":
-  version: 2.23.0
-  resolution: "@dotenvx/dotenvx@npm:2.23.0"
+  version: 2.24.0
+  resolution: "@dotenvx/dotenvx@npm:2.24.0"
   dependencies:
     "@dotenvx/primitives": "npm:^2.2.0"
     "@dotenvx/tooling": "npm:^1.0.3"
@@ -1959,7 +1959,7 @@ __metadata:
   bin:
     dotenvx: src/cli/dotenvx.js
     dx: src/cli/dotenvx.js
-  checksum: 10/ebc3aed6caa701b7c7d903f2703facf53d1ee838ae65e7148ecd25ae64e124ce09cf7372923bd36fc399033cd8ad8adc36b067eab9c6f5eeee2595fd4c1429a7
+  checksum: 10/0a8dfa463ba57a9c6a2597acea056277042d532d42dbe083da51f089fd96db28339256360d3e1005f5866adb4632a1808582831658921158f81055a9f341605c
   languageName: node
   linkType: hard
 
