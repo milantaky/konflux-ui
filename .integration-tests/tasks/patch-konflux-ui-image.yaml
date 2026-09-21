@@ -1,0 +1,125 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: patch-konflux-ui-image
+  annotations:
+    tekton.dev/displayName: 'Patch Konflux UI image'
+    tekton.dev/categories: 'Pipeline'
+    tekton.dev/tags: 'e2e,konflux-ui,deploy'
+spec:
+  description: >-
+    Replaces the stock UI image pinned by konflux-ci deploy with the SNAPSHOT UI
+    image under test. Mirrors the GitHub Actions PR-check inject step: optionally
+    scale down konflux-operator so it cannot revert the proxy patch, then patch
+    deployment/proxy initContainer copy-static-content.
+
+    Needed because deploy-konflux-ci update-kustomization looks for
+    quay.io/konflux-ci/ui when component-name is ui, but the kustomization image
+    is quay.io/konflux-ci/konflux-ui — so component-image-* overrides never apply.
+  params:
+    - name: cluster-access-secret
+      type: string
+      description: Secret with kubeconfig for the kind cluster (kfg-<pipelinerun>).
+    - name: container-image
+      type: string
+      default: ''
+      description: >-
+        Full UI image reference from test-metadata (SNAPSHOT containerImage),
+        typically quay.io/redhat-user-workloads/.../konflux-ui@sha256:... or :tag.
+    - name: fallback-ui-image
+      type: string
+      default: 'quay.io/konflux-ci/konflux-ui:latest'
+      description: >-
+        Used when container-image is empty or is the Cypress test runner image
+        (e.g. manual runs whose SNAPSHOT default still points at konflux-ui-tests).
+  volumes:
+    - name: cluster-credentials
+      secret:
+        secretName: $(params.cluster-access-secret)
+  steps:
+    - name: patch-proxy-ui-image
+      image: docker.io/bitnami/kubectl@sha256:95de17e6eb92da83a58c90a9df0c4cede634f898d2e6b92ea04f4a6ee6ace08d # kubectl 1.36.3
+      env:
+        - name: KUBECONFIG
+          value: /cluster-credentials/kubeconfig
+        - name: CONTAINER_IMAGE
+          value: $(params.container-image)
+        - name: FALLBACK_UI_IMAGE
+          value: $(params.fallback-ui-image)
+      volumeMounts:
+        - name: cluster-credentials
+          mountPath: /cluster-credentials
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        is_ui_image() {
+          local image="$1"
+          [[ -n "${image}" ]] || return 1
+          # Reject the Cypress runner image mistaken for the UI in SNAPSHOT defaults.
+          [[ "${image}" != *konflux-ui-tests* ]] || return 1
+          # Accept published UI and Konflux-built PR/push images.
+          [[ "${image}" == *"/konflux-ui"* ]] || return 1
+          return 0
+        }
+
+        if is_ui_image "${CONTAINER_IMAGE}"; then
+          UI_IMAGE="${CONTAINER_IMAGE}"
+          echo "[INFO] Using SNAPSHOT UI image: ${UI_IMAGE}"
+        else
+          UI_IMAGE="${FALLBACK_UI_IMAGE}"
+          echo "[WARN] SNAPSHOT has no usable UI image ('${CONTAINER_IMAGE}')."
+          echo "[WARN] Falling back to: ${UI_IMAGE}"
+        fi
+
+        echo "[INFO] Scaling down konflux-operator so it cannot revert the proxy patch"
+        if kubectl get deployment/konflux-operator-controller-manager -n konflux-operator &>/dev/null; then
+          kubectl scale deployment/konflux-operator-controller-manager \
+            -n konflux-operator --replicas=0
+          kubectl wait --for=delete pod -l control-plane=controller-manager \
+            -n konflux-operator --timeout=2m || true
+        else
+          echo "[INFO] konflux-operator-controller-manager not found; continuing"
+        fi
+
+        echo "[INFO] Current proxy initContainers:"
+        kubectl get deployment proxy -n konflux-ui \
+          -o jsonpath='{range .spec.template.spec.initContainers[*]}{.name}={.image}{"\n"}{end}' \
+          || true
+
+        echo "[INFO] Patching deployment/proxy copy-static-content -> ${UI_IMAGE}"
+        # Escape JSON-sensitive characters in the image reference.
+        UI_IMAGE_JSON=$(printf '%s' "${UI_IMAGE}" | sed 's/\\/\\\\/g; s/"/\\"/g')
+        kubectl patch deployment proxy -n konflux-ui --type='strategic' -p="{
+          \"spec\": {
+            \"template\": {
+              \"spec\": {
+                \"initContainers\": [
+                  {
+                    \"name\": \"copy-static-content\",
+                    \"image\": \"${UI_IMAGE_JSON}\",
+                    \"imagePullPolicy\": \"Always\"
+                  }
+                ]
+              }
+            }
+          }
+        }"
+
+        echo "[INFO] Waiting for proxy rollout"
+        if ! kubectl rollout status deployment/proxy -n konflux-ui --timeout=5m; then
+          echo "[ERROR] Proxy deployment rollout failed"
+          kubectl describe deployment proxy -n konflux-ui
+          kubectl get pods -n konflux-ui -l app=proxy -o wide
+          for pod in $(kubectl get pods -n konflux-ui -l app=proxy -o name); do
+            echo "=== ${pod} ==="
+            kubectl describe "${pod}" -n konflux-ui
+            kubectl logs "${pod}" -n konflux-ui --all-containers --previous 2>/dev/null || true
+          done
+          exit 1
+        fi
+
+        echo "[INFO] Proxy initContainers after patch:"
+        kubectl get deployment proxy -n konflux-ui \
+          -o jsonpath='{range .spec.template.spec.initContainers[*]}{.name}={.image}{"\n"}{end}'
+        echo "[INFO] UI image patch complete"
