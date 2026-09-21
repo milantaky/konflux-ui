@@ -57,8 +57,7 @@ spec:
           local image="$1"
           [[ -n "${image}" ]] || return 1
           # Reject only the Cypress runner image (SNAPSHOT defaults sometimes point at it).
-          # Accept any other SNAPSHOT image — component repos vary
-          # (e.g. .../konflux-ui/... or .../updated-image@sha256:...).
+          # Accept any other SNAPSHOT image — component names vary (konflux-ui, updated-image, …).
           [[ "${image}" != *konflux-ui-tests* ]] || return 1
           return 0
         }
