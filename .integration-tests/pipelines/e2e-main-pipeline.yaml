@@ -3,7 +3,7 @@ apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
   name: e2e-main-pipeline
-  namespace: konflux-ui-tenant
+  namespace: mtakac-tenant
 spec:
   params:
     - name: SNAPSHOT
