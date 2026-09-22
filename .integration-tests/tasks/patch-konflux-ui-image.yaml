@@ -56,10 +56,9 @@ spec:
         is_ui_image() {
           local image="$1"
           [[ -n "${image}" ]] || return 1
-          # Reject the Cypress runner image mistaken for the UI in SNAPSHOT defaults.
+          # Reject only the Cypress runner image (SNAPSHOT defaults sometimes point at it).
+          # Accept any other SNAPSHOT image — component names vary (konflux-ui, updated-image, …).
           [[ "${image}" != *konflux-ui-tests* ]] || return 1
-          # Accept published UI and Konflux-built PR/push images.
-          [[ "${image}" == *"/konflux-ui"* ]] || return 1
           return 0
         }
 
