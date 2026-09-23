@@ -139,8 +139,8 @@ spec:
       params:
         - name: cluster-access-secret
           value: kfg-$(context.pipelineRun.name)
-        # - name: component-name
-        #   value: ui
+        - name: component-name
+          value: ui
         - name: component-image-repository
           value: $(tasks.test-metadata.results.container-repo)
         - name: component-image-tag
