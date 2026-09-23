@@ -161,27 +161,27 @@ spec:
     # deploy-konflux-ci cannot override quay.io/konflux-ci/konflux-ui when
     # component-name is ui (yq selects quay.io/konflux-ci/ui). Patch the proxy
     # initContainer to the SNAPSHOT UI image, same as GitHub Actions PR check.
-    # - name: patch-konflux-ui-image
-    #   runAfter:
-    #     - deploy-konflux
-    #   when:
-    #     - input: '$(params.job-type)'
-    #       operator: notin
-    #       values: ['periodic-stage']
-    #   taskRef:
-    #     resolver: git
-    #     params:
-    #       - name: url
-    #         value: https://github.com/milantaky/konflux-ui
-    #       - name: revision
-    #         value: fix/updated-ui-image
-    #       - name: pathInRepo
-    #         value: .integration-tests/tasks/patch-konflux-ui-image.yaml
-    #   params:
-    #     - name: cluster-access-secret
-    #       value: kfg-$(context.pipelineRun.name)
-    #     - name: container-image
-    #       value: $(tasks.test-metadata.results.container-image)
+    - name: patch-konflux-ui-image
+      runAfter:
+        - deploy-konflux
+      when:
+        - input: '$(params.job-type)'
+          operator: notin
+          values: ['periodic-stage']
+      taskRef:
+        resolver: git
+        params:
+          - name: url
+            value: https://github.com/milantaky/konflux-ui
+          - name: revision
+            value: fix/updated-ui-image
+          - name: pathInRepo
+            value: .integration-tests/tasks/patch-konflux-ui-image.yaml
+      params:
+        - name: cluster-access-secret
+          value: kfg-$(context.pipelineRun.name)
+        - name: container-image
+          value: $(tasks.test-metadata.results.container-image)
 
     - name: monitor-webhook-logs
       runAfter:
@@ -205,8 +205,7 @@ spec:
 
     - name: run-e2e-konflux-ui
       runAfter:
-        # - patch-konflux-ui-image
-        - deploy-konflux
+        - patch-konflux-ui-image
       taskRef:
         resolver: git
         params:
