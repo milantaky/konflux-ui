@@ -205,7 +205,8 @@ spec:
 
     - name: run-e2e-konflux-ui
       runAfter:
-        - patch-konflux-ui-image
+        # - patch-konflux-ui-image
+        - deploy-konflux
       taskRef:
         resolver: git
         params:
