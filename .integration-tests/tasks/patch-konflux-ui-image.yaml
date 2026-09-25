@@ -8,10 +8,9 @@ metadata:
     tekton.dev/tags: 'e2e,konflux-ui,deploy'
 spec:
   description: >-
-    Replaces the stock UI image pinned by konflux-ci deploy with the SNAPSHOT UI
-    image under test. Mirrors the GitHub Actions PR-check inject step: optionally
-    scale down konflux-operator so it cannot revert the proxy patch, then patch
-    deployment/proxy initContainer copy-static-content.
+    Replaces the stock UI image pinned by konflux-ci deploy with the SNAPSHOT
+    image under test. Scales down konflux-operator so it cannot revert the
+    proxy patch, then patches deployment/proxy initContainer copy-static-content.
 
     Needed because deploy-konflux-ci update-kustomization looks for
     quay.io/konflux-ci/ui when component-name is ui, but the kustomization image
@@ -22,16 +21,9 @@ spec:
       description: Secret with kubeconfig for the kind cluster (kfg-<pipelinerun>).
     - name: container-image
       type: string
-      default: ''
       description: >-
-        Full UI image reference from test-metadata (SNAPSHOT containerImage),
-        typically quay.io/redhat-user-workloads/.../konflux-ui@sha256:... or :tag.
-    - name: fallback-ui-image
-      type: string
-      default: 'quay.io/konflux-ci/konflux-ui:latest'
-      description: >-
-        Used when container-image is empty or is the Cypress test runner image
-        (e.g. manual runs whose SNAPSHOT default still points at konflux-ui-tests).
+        Full image reference from SNAPSHOT (test-metadata container-image),
+        e.g. quay.io/redhat-user-workloads/.../konflux-ui@sha256:... or :tag.
   volumes:
     - name: cluster-credentials
       secret:
@@ -44,8 +36,6 @@ spec:
           value: /cluster-credentials/kubeconfig
         - name: CONTAINER_IMAGE
           value: $(params.container-image)
-        - name: FALLBACK_UI_IMAGE
-          value: $(params.fallback-ui-image)
       volumeMounts:
         - name: cluster-credentials
           mountPath: /cluster-credentials
@@ -53,23 +43,12 @@ spec:
         #!/usr/bin/env bash
         set -euo pipefail
 
-        is_ui_image() {
-          local image="$1"
-          [[ -n "${image}" ]] || return 1
-          # Reject only the Cypress runner image (SNAPSHOT defaults sometimes point at it).
-          # Accept any other SNAPSHOT image — component names vary (konflux-ui, updated-image, …).
-          [[ "${image}" != *konflux-ui-tests* ]] || return 1
-          return 0
-        }
-
-        if is_ui_image "${CONTAINER_IMAGE}"; then
-          UI_IMAGE="${CONTAINER_IMAGE}"
-          echo "[INFO] Using SNAPSHOT UI image: ${UI_IMAGE}"
-        else
-          UI_IMAGE="${FALLBACK_UI_IMAGE}"
-          echo "[WARN] SNAPSHOT has no usable UI image ('${CONTAINER_IMAGE}')."
-          echo "[WARN] Falling back to: ${UI_IMAGE}"
+        if [[ -z "${CONTAINER_IMAGE}" ]]; then
+          echo "[ERROR] container-image param is empty; expected SNAPSHOT image"
+          exit 1
         fi
+
+        echo "[INFO] Using SNAPSHOT image: ${CONTAINER_IMAGE}"
 
         echo "[INFO] Scaling down konflux-operator so it cannot revert the proxy patch"
         if kubectl get deployment/konflux-operator-controller-manager -n konflux-operator &>/dev/null; then
@@ -86,9 +65,9 @@ spec:
           -o jsonpath='{range .spec.template.spec.initContainers[*]}{.name}={.image}{"\n"}{end}' \
           || true
 
-        echo "[INFO] Patching deployment/proxy copy-static-content -> ${UI_IMAGE}"
+        echo "[INFO] Patching deployment/proxy copy-static-content -> ${CONTAINER_IMAGE}"
         # Escape JSON-sensitive characters in the image reference.
-        UI_IMAGE_JSON=$(printf '%s' "${UI_IMAGE}" | sed 's/\\/\\\\/g; s/"/\\"/g')
+        IMAGE_JSON=$(printf '%s' "${CONTAINER_IMAGE}" | sed 's/\\/\\\\/g; s/"/\\"/g')
         kubectl patch deployment proxy -n konflux-ui --type='strategic' -p="{
           \"spec\": {
             \"template\": {
@@ -96,7 +75,7 @@ spec:
                 \"initContainers\": [
                   {
                     \"name\": \"copy-static-content\",
-                    \"image\": \"${UI_IMAGE_JSON}\",
+                    \"image\": \"${IMAGE_JSON}\",
                     \"imagePullPolicy\": \"Always\"
                   }
                 ]

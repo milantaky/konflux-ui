@@ -9,9 +9,8 @@ spec:
     - name: SNAPSHOT
       description: >-
         Snapshot of the application under test. Konflux injects the built UI image
-        (quay.io/redhat-user-workloads/.../konflux-ui:...). The default below is only
-        a fallback for manual runs and still points at the Cypress test runner —
-        patch-konflux-ui-image detects that and falls back to quay.io/konflux-ci/konflux-ui:latest.
+        (quay.io/redhat-user-workloads/.../konflux-ui:...). patch-konflux-ui-image
+        applies that image to deployment/proxy. The default is only for manual runs.
       default: '{"components": [{"name":"konflux-ui", "containerImage": "quay.io/konflux_ui_qe/konflux-ui-tests:latest"}]}'
       type: string
     - name: konflux-test-infra-secret
@@ -141,10 +140,6 @@ spec:
           value: kfg-$(context.pipelineRun.name)
         - name: component-name
           value: ui
-        - name: component-image-repository
-          value: $(tasks.test-metadata.results.container-repo)
-        - name: component-image-tag
-          value: $(tasks.test-metadata.results.container-tag)
         - name: component-pr-owner
           value: $(tasks.test-metadata.results.pull-request-author)
         - name: component-pr-sha
