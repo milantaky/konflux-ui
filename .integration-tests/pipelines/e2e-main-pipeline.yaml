@@ -177,6 +177,8 @@ spec:
           value: kfg-$(context.pipelineRun.name)
         - name: container-image
           value: $(tasks.test-metadata.results.container-image)
+        - name: build-credentials
+          value: $(params.build-credentials-secret)
 
     - name: monitor-webhook-logs
       runAfter:

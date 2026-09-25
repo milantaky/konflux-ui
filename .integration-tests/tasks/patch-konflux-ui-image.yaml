@@ -9,8 +9,10 @@ metadata:
 spec:
   description: >-
     Replaces the stock UI image pinned by konflux-ci deploy with the SNAPSHOT
-    image under test. Scales down konflux-operator so it cannot revert the
-    proxy patch, then patches deployment/proxy initContainer copy-static-content.
+    image under test. Creates a Quay pull secret on the kind cluster from
+    build-credentials, attaches it to the proxy SA/deployment, scales down
+    konflux-operator, then patches deployment/proxy initContainer
+    copy-static-content.
 
     Needed because deploy-konflux-ci update-kustomization looks for
     quay.io/konflux-ci/ui when component-name is ui, but the kustomization image
@@ -24,10 +26,18 @@ spec:
       description: >-
         Full image reference from SNAPSHOT (test-metadata container-image),
         e.g. quay.io/redhat-user-workloads/.../konflux-ui@sha256:... or :tag.
+    - name: build-credentials
+      type: string
+      description: >-
+        Secret with quay-org-token (and optional quay-org-name) used to pull the
+        private SNAPSHOT image into the kind cluster.
   volumes:
     - name: cluster-credentials
       secret:
         secretName: $(params.cluster-access-secret)
+    - name: build-credentials
+      secret:
+        secretName: $(params.build-credentials)
   steps:
     - name: patch-proxy-ui-image
       image: docker.io/bitnami/kubectl@sha256:95de17e6eb92da83a58c90a9df0c4cede634f898d2e6b92ea04f4a6ee6ace08d # kubectl 1.36.3
@@ -39,12 +49,22 @@ spec:
       volumeMounts:
         - name: cluster-credentials
           mountPath: /cluster-credentials
+        - name: build-credentials
+          mountPath: /build-credentials
       script: |
         #!/usr/bin/env bash
         set -euo pipefail
 
+        PULL_SECRET_NAME=snapshot-ui-pull
+
         if [[ -z "${CONTAINER_IMAGE}" ]]; then
           echo "[ERROR] container-image param is empty; expected SNAPSHOT image"
+          exit 1
+        fi
+
+        if [[ ! -f /build-credentials/quay-org-token ]]; then
+          echo "[ERROR] /build-credentials/quay-org-token missing; cannot pull private SNAPSHOT image"
+          ls -la /build-credentials || true
           exit 1
         fi
 
@@ -60,6 +80,19 @@ spec:
           echo "[INFO] konflux-operator-controller-manager not found; continuing"
         fi
 
+        echo "[INFO] Creating Quay pull secret ${PULL_SECRET_NAME} in konflux-ui"
+        # Quay OAuth tokens authenticate with username \$oauthtoken.
+        kubectl create secret docker-registry "${PULL_SECRET_NAME}" \
+          --namespace=konflux-ui \
+          --docker-server=quay.io \
+          --docker-username='$oauthtoken' \
+          --docker-password="$(cat /build-credentials/quay-org-token)" \
+          --dry-run=client -o yaml | kubectl apply -f -
+
+        echo "[INFO] Attaching pull secret to serviceaccount/proxy"
+        kubectl patch serviceaccount proxy -n konflux-ui --type=merge \
+          -p "{\"imagePullSecrets\":[{\"name\":\"${PULL_SECRET_NAME}\"}]}"
+
         echo "[INFO] Current proxy initContainers:"
         kubectl get deployment proxy -n konflux-ui \
           -o jsonpath='{range .spec.template.spec.initContainers[*]}{.name}={.image}{"\n"}{end}' \
@@ -72,6 +105,9 @@ spec:
           \"spec\": {
             \"template\": {
               \"spec\": {
+                \"imagePullSecrets\": [
+                  {\"name\": \"${PULL_SECRET_NAME}\"}
+                ],
                 \"initContainers\": [
                   {
                     \"name\": \"copy-static-content\",
