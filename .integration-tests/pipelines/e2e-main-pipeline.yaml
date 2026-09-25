@@ -140,6 +140,10 @@ spec:
           value: kfg-$(context.pipelineRun.name)
         - name: component-name
           value: ui
+        - name: component-image-repository
+          value: $(tasks.test-metadata.results.container-repo)
+        - name: component-image-tag
+          value: $(tasks.test-metadata.results.container-tag)
         - name: component-pr-owner
           value: $(tasks.test-metadata.results.pull-request-author)
         - name: component-pr-sha
