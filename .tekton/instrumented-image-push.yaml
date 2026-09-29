@@ -5,8 +5,8 @@ metadata:
     build.appstudio.openshift.io/repo: https://github.com/milantaky/konflux-ui?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
-    pipelinesascode.tekton.dev/cancel-in-progress: "false"
-    pipelinesascode.tekton.dev/max-keep-runs: "3"
+    pipelinesascode.tekton.dev/cancel-in-progress: 'false'
+    pipelinesascode.tekton.dev/max-keep-runs: '3'
     pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
       == "feat/instrumented-image"
   labels:
@@ -316,53 +316,53 @@ spec:
             - name: kind
               value: task
           resolver: bundles
-      - name: build-instrumented-container
-        params:
-          - name: IMAGE
-            value: $(params.instrumented-output-image)
-          - name: DOCKERFILE
-            value: $(params.instrumented-dockerfile)
-          - name: CONTEXT
-            value: $(params.path-context)
-          - name: HERMETIC
-            value: $(params.hermetic)
-          - name: PREFETCH_INPUT
-            value: $(params.prefetch-input)
-          - name: IMAGE_EXPIRES_AFTER
-            value: $(params.image-expires-after)
-          - name: COMMIT_SHA
-            value: $(tasks.clone-repository.results.commit)
-          - name: BUILD_ARGS
-            value:
-              - $(params.build-args[*])
-          - name: BUILD_ARGS_FILE
-            value: $(params.build-args-file)
-          - name: SOURCE_URL
-            value: $(tasks.clone-repository.results.url)
-          - name: BUILDAH_FORMAT
-            value: $(params.buildah-format)
-          - name: SOURCE_DATE_EPOCH
-            value: $(params.source-date-epoch)
-          - name: REWRITE_TIMESTAMP
-            value: $(params.rewrite-timestamp)
-          - name: OMIT_HISTORY
-            value: $(params.omit-history)
-          - name: SOURCE_ARTIFACT
-            value: $(tasks.prefetch-dependencies.results.SOURCE_ARTIFACT)
-          - name: CACHI2_ARTIFACT
-            value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
-        runAfter:
-          - prefetch-dependencies
-        taskRef:
-          params:
-            - name: name
-              value: buildah-oci-ta
-            - name: bundle
-              value: quay.io/konflux-ci/tekton-catalog/task-buildah-oci-ta:0.10.5@sha256:5fcf620537b0dece56a9c9a8090ce7592a874da92cc2a5d398abdc2382eb8a3c
-            - name: kind
-              value: task
-          resolver: bundles
-      - name: apply-tags-instrumented
+        # - name: build-instrumented-container
+        #   params:
+        #     - name: IMAGE
+        #       value: $(params.instrumented-output-image)
+        #     - name: DOCKERFILE
+        #       value: $(params.instrumented-dockerfile)
+        #     - name: CONTEXT
+        #       value: $(params.path-context)
+        #     - name: HERMETIC
+        #       value: $(params.hermetic)
+        #     - name: PREFETCH_INPUT
+        #       value: $(params.prefetch-input)
+        #     - name: IMAGE_EXPIRES_AFTER
+        #       value: $(params.image-expires-after)
+        #     - name: COMMIT_SHA
+        #       value: $(tasks.clone-repository.results.commit)
+        #     - name: BUILD_ARGS
+        #       value:
+        #         - $(params.build-args[*])
+        #     - name: BUILD_ARGS_FILE
+        #       value: $(params.build-args-file)
+        #     - name: SOURCE_URL
+        #       value: $(tasks.clone-repository.results.url)
+        #     - name: BUILDAH_FORMAT
+        #       value: $(params.buildah-format)
+        #     - name: SOURCE_DATE_EPOCH
+        #       value: $(params.source-date-epoch)
+        #     - name: REWRITE_TIMESTAMP
+        #       value: $(params.rewrite-timestamp)
+        #     - name: OMIT_HISTORY
+        #       value: $(params.omit-history)
+        #     - name: SOURCE_ARTIFACT
+        #       value: $(tasks.prefetch-dependencies.results.SOURCE_ARTIFACT)
+        #     - name: CACHI2_ARTIFACT
+        #       value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
+        #   runAfter:
+        #     - prefetch-dependencies
+        #   taskRef:
+        #     params:
+        #       - name: name
+        #         value: buildah-oci-ta
+        #       - name: bundle
+        #         value: quay.io/konflux-ci/tekton-catalog/task-buildah-oci-ta:0.10.5@sha256:5fcf620537b0dece56a9c9a8090ce7592a874da92cc2a5d398abdc2382eb8a3c
+        #       - name: kind
+        #         value: task
+        #     resolver: bundles
+        # - name: apply-tags-instrumented
         params:
           - name: IMAGE_URL
             value: $(tasks.build-instrumented-container.results.IMAGE_URL)
