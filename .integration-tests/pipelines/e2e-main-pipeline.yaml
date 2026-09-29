@@ -50,9 +50,8 @@ spec:
       default: build-credentials
     - name: ui-image-pull-secret
       description: >-
-        Secret in this namespace that can pull the private SNAPSHOT UI image
-        (kubernetes.io/dockerconfigjson with .dockerconfigjson, or
-        oci-storage-dockerconfigjson). Copied onto kind for deployment/proxy.
+        Konflux image pull secret (IPS) that can pull the private SNAPSHOT UI
+        image. Copied onto kind for deployment/proxy.
       type: string
       default: components-namespace-pull
     - name: spec-file

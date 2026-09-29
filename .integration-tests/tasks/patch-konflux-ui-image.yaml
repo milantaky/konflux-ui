@@ -28,9 +28,8 @@ spec:
     - name: pull-secret
       type: string
       description: >-
-        Name of a Secret in the PipelineRun namespace that can pull the SNAPSHOT
-        image. Must contain .dockerconfigjson (type kubernetes.io/dockerconfigjson)
-        or oci-storage-dockerconfigjson.
+        Konflux image pull secret (IPS) in the PipelineRun namespace that can
+        pull the SNAPSHOT image (kubernetes.io/dockerconfigjson).
   volumes:
     - name: cluster-credentials
       secret:
@@ -62,21 +61,14 @@ spec:
           exit 1
         fi
 
-        DOCKERCONFIG=""
-        for candidate in /pull-secret/.dockerconfigjson /pull-secret/oci-storage-dockerconfigjson; do
-          if [[ -f "${candidate}" ]]; then
-            DOCKERCONFIG="${candidate}"
-            break
-          fi
-        done
-        if [[ -z "${DOCKERCONFIG}" ]]; then
-          echo "[ERROR] pull-secret has no .dockerconfigjson or oci-storage-dockerconfigjson"
+        DOCKERCONFIG=/pull-secret/.dockerconfigjson
+        if [[ ! -f "${DOCKERCONFIG}" ]]; then
+          echo "[ERROR] pull-secret missing .dockerconfigjson (expected a Konflux IPS)"
           ls -la /pull-secret || true
           exit 1
         fi
 
         echo "[INFO] Using SNAPSHOT image: ${CONTAINER_IMAGE}"
-        echo "[INFO] Using pull credentials from ${DOCKERCONFIG}"
 
         echo "[INFO] Scaling down konflux-operator so it cannot revert the proxy patch"
         if kubectl get deployment/konflux-operator-controller-manager -n konflux-operator &>/dev/null; then
