@@ -66,11 +66,11 @@ spec:
       description: 'Skip sending the Slack notification'
       default: 'false'
       type: string
-    - name: test-image-tag
+    - name: test-image-repository
       description: >-
-        Tag for the E2E test image (quay.io/konflux_ui_qe/konflux-ui-tests:<tag>).
-        Repository is fixed so PipelineRuns cannot point the secret-bearing step at an arbitrary image.
-      default: 'latest'
+        E2E test image repository without tag. Must match e2e-output-image from
+        the konflux-ui build pipeline (e2e-on-pr-<sha> for pull_request, e2e-<sha> for push).
+      default: 'quay.io/redhat-user-workloads/konflux-ui-tenant/konflux-ui/konflux-ui'
       type: string
   tasks:
     - name: test-metadata
@@ -213,7 +213,7 @@ spec:
         - name: monitoring-duration
           value: '5m'
 
-    - name: run-e2e-konflux-ui
+    - name: format-e2e-test-image
       runAfter:
         - patch-konflux-ui-image
       taskRef:
@@ -233,8 +233,8 @@ spec:
           value: $(params.oci-container-repo):$(context.pipelineRun.name)
         - name: oci-credentials
           value: $(params.oci-credentials-secret)
-        - name: test-image-tag
-          value: $(params.test-image-tag)
+        - name: test-image
+          value: $(tasks.format-e2e-test-image.results.test-image)
         - name: spec-file
           value: $(params.spec-file)
         - name: github-credentials-secret
@@ -251,6 +251,8 @@ spec:
           value: $(tasks.test-metadata.results.target-repo-branch)
         - name: target-repo-url
           value: https://github.com/$(tasks.test-metadata.results.git-org)/$(tasks.test-metadata.results.git-repo)
+        - name: pipeline-run-name
+          value: $(context.pipelineRun.name)
   finally:
     - name: deprovision-kind-cluster
       when:
