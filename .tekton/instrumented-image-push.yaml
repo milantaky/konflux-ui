@@ -379,11 +379,11 @@ spec:
             - name: kind
               value: task
           resolver: bundles
-      - matrix:
-          params:
-            - name: PLATFORM
-              value:
-                - $(params.build-platforms)
+        # - matrix:
+        #     params:
+        #       - name: PLATFORM
+        #         value:
+        #           - $(params.build-platforms)
         name: build-images
         params:
           - name: IMAGE
