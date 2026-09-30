@@ -39,7 +39,8 @@ spec:
         secretName: $(params.pull-secret)
   steps:
     - name: patch-proxy-ui-image
-      image: docker.io/bitnami/kubectl@sha256:95de17e6eb92da83a58c90a9df0c4cede634f898d2e6b92ea04f4a6ee6ace08d # kubectl 1.36.3
+      # OpenShift CLI (quay) — bash + oc/kubectl; avoid docker.io/bitnami
+      image: quay.io/openshift/origin-cli@sha256:413dfdf341c9c442d43743f62e897dcc7ea0693ee69e1bc3906f8dd407725dcf
       env:
         - name: KUBECONFIG
           value: /cluster-credentials/kubeconfig
@@ -53,6 +54,11 @@ spec:
       script: |
         #!/usr/bin/env bash
         set -euo pipefail
+
+        # # origin-cli may expose only `oc`; keep kubectl calls working.
+        # if ! command -v kubectl >/dev/null 2>&1; then
+        #   kubectl() { command oc "$@"; }
+        # fi
 
         KIND_PULL_SECRET_NAME=snapshot-ui-pull
 
