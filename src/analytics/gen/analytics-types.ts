@@ -223,6 +223,12 @@ export type EventPropertiesMap = {
   [TrackEvents.feedback_submitted_event]: Omit<FeedbackSubmittedEvent, keyof CommonFields>;
   [TrackEvents.ui_session_started_event]: Omit<UiSessionStartedEvent, keyof CommonFields>;
   [TrackEvents.feature_flags_changed_event]: Omit<FeatureFlagsChangedEvent, keyof CommonFields>;
-  [TrackEvents.conforma_violations_link_clicked_event]: Omit<ConformaViolationsLinkClickedEvent, keyof CommonFields>;
-  [TrackEvents.integration_test_rerun_triggered_event]: Omit<IntegrationTestRerunTriggeredEvent, keyof CommonFields>;
+  [TrackEvents.conforma_violations_link_clicked_event]: Omit<
+    ConformaViolationsLinkClickedEvent,
+    keyof CommonFields
+  >;
+  [TrackEvents.integration_test_rerun_triggered_event]: Omit<
+    IntegrationTestRerunTriggeredEvent,
+    keyof CommonFields
+  >;
 };
