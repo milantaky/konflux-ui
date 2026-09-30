@@ -55,11 +55,6 @@ spec:
         #!/usr/bin/env bash
         set -euo pipefail
 
-        # # origin-cli may expose only `oc`; keep kubectl calls working.
-        # if ! command -v kubectl >/dev/null 2>&1; then
-        #   kubectl() { command oc "$@"; }
-        # fi
-
         KIND_PULL_SECRET_NAME=snapshot-ui-pull
 
         if [[ -z "${CONTAINER_IMAGE}" ]]; then
