@@ -1,7 +1,6 @@
 node_modules/*
 static/*
 dist/*
-@types/*
 .eslintrc.cjs
 .eslintrc.restrict-imports.cjs
 e2e-tests/*

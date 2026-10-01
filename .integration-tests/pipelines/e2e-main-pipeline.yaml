@@ -317,35 +317,35 @@ spec:
         - name: pipeline-aggregate-status
           value: '$(tasks.status)'
 
-    - name: pull-request-status-message
-      when:
-        - input: '$(params.job-type)'
-          operator: notin
-          values: ['periodic-stage', 'periodic-local']
-      taskRef:
-        resolver: git
-        params:
-          - name: url
-            value: https://github.com/konflux-ci/tekton-integration-catalog.git
-          - name: revision
-            value: main
-          - name: pathInRepo
-            value: tasks/pull-request-comment/0.2/pull-request-comment.yaml
-      params:
-        - name: test-name
-          value: '$(context.pipelineRun.name)'
-        - name: oci-container
-          value: '$(params.oci-container-repo):$(context.pipelineRun.name)'
-        - name: job-spec
-          value: '$(tasks.test-metadata.results.job-spec)'
-        - name: pipeline-aggregate-status
-          value: '$(tasks.status)'
-        - name: junit-report-name
-          value: e2e-report.xml
-        - name: enable-test-results-analysis
-          value: 'true'
-        - name: artifact-browser-url
-          value: '$(params.artifact-browser-url)'
+    # - name: pull-request-status-message
+    #   when:
+    #     - input: '$(params.job-type)'
+    #       operator: notin
+    #       values: ['periodic-stage', 'periodic-local']
+    #   taskRef:
+    #     resolver: git
+    #     params:
+    #       - name: url
+    #         value: https://github.com/konflux-ci/tekton-integration-catalog.git
+    #       - name: revision
+    #         value: main
+    #       - name: pathInRepo
+    #         value: tasks/pull-request-comment/0.2/pull-request-comment.yaml
+    #   params:
+    #     - name: test-name
+    #       value: '$(context.pipelineRun.name)'
+    #     - name: oci-container
+    #       value: '$(params.oci-container-repo):$(context.pipelineRun.name)'
+    #     - name: job-spec
+    #       value: '$(tasks.test-metadata.results.job-spec)'
+    #     - name: pipeline-aggregate-status
+    #       value: '$(tasks.status)'
+    #     - name: junit-report-name
+    #       value: e2e-report.xml
+    #     - name: enable-test-results-analysis
+    #       value: 'true'
+    #     - name: artifact-browser-url
+    #       value: '$(params.artifact-browser-url)'
 
     - name: send-slack-notification
       when:
