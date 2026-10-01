@@ -39,8 +39,8 @@ spec:
         secretName: $(params.pull-secret)
   steps:
     - name: patch-proxy-ui-image
-      # OpenShift CLI (quay) — bash + oc/kubectl; avoid docker.io/bitnami
-      image: quay.io/openshift/origin-cli@sha256:413dfdf341c9c442d43743f62e897dcc7ea0693ee69e1bc3906f8dd407725dcf
+      # Same image as deploy-konflux-ci steps — known pullable in Konflux.
+      image: quay.io/konflux-ci/tekton-integration-catalog/utils:latest
       env:
         - name: KUBECONFIG
           value: /cluster-credentials/kubeconfig
@@ -55,6 +55,7 @@ spec:
         #!/usr/bin/env bash
         set -euo pipefail
 
+        echo "[INFO] patch-konflux-ui-image starting"
         KIND_PULL_SECRET_NAME=snapshot-ui-pull
 
         if [[ -z "${CONTAINER_IMAGE}" ]]; then
