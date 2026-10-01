@@ -82,14 +82,9 @@ spec:
       results:
         - name: base-url
           description: 'Konflux base URL for Cypress tests (https://<kind-ip>:9443)'
-      image: quay.io/openshift/origin-cli@sha256:413dfdf341c9c442d43743f62e897dcc7ea0693ee69e1bc3906f8dd407725dcf
+      # Same image as deploy-konflux-ci — avoid docker.io/bitnami and bad origin-cli digests.
+      image: quay.io/konflux-ci/tekton-integration-catalog/utils:latest
       env:
-        # context.pipelineRun.* is only available in Pipeline specs, not Task scripts.
-        # Use the TaskRun downward API label that Tekton sets on every task pod.
-        - name: TEKTON_PIPELINE_RUN
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.labels['tekton.dev/pipelineRun']
         - name: TEKTON_NAMESPACE
           valueFrom:
             fieldRef:
@@ -106,6 +101,7 @@ spec:
 
         echo "=== Getting PipelineRun name and kubeconfig ==="
 
+        # Passed from the Pipeline (resolved at PipelineRun level).
         PIPELINE_RUN_NAME="$(params.pipeline-run-name)"
         NAMESPACE="${TEKTON_NAMESPACE}"
         echo "PipelineRun name: ${PIPELINE_RUN_NAME}"
