@@ -40,7 +40,10 @@ const AppHeaderComponent: React.FC<AppHeaderPros> = ({
         <MastheadBrand>
           <MastheadLogo>
             <Brand alt="" heights={{ default: '36px' }}>
-              <KonfluxLogo aria-label="konflux" />
+              {/* TEMP: flip logo to verify SNAPSHOT UI image is deployed — remove after testing */}
+              <span style={{ display: 'inline-flex', transform: 'scaleX(-1)' }}>
+                <KonfluxLogo aria-label="konflux" />
+              </span>
             </Brand>
           </MastheadLogo>
         </MastheadBrand>
