@@ -35,7 +35,7 @@ spec:
       description: 'Console base URL (e.g., https://console.redhat.com/preview/application-pipeline)'
   steps:
     - name: send-notification
-      image: registry.access.redhat.com/ubi9/ubi@sha256:03b3d228574922e50bc654aea24a213f68467937c5cc001b5786815152d6f4e2
+      image: registry.access.redhat.com/ubi9/ubi@sha256:c26665a762876d5de27d1ed50e029ab3bc80ef3a3e155824ee7ab43e70055b63
       env:
         - name: PIPELINE_STATUS
           value: $(params.pipeline-aggregate-status)
