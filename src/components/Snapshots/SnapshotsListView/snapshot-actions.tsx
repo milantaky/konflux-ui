@@ -18,6 +18,8 @@ export const useSnapshotActions = (snapshot: Snapshot, source?: ResourceSource):
       return [];
     }
 
+    // eskereee
+
     const isArchived = source !== ResourceSource.Cluster;
     const canTriggerRelease = canCreateRelease && !isArchived;
 
