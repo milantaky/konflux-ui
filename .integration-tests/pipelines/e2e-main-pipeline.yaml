@@ -162,9 +162,9 @@ spec:
         resolver: git
         params:
           - name: url
-            value: https://github.com/konflux-ci/konflux-ui
+            value: https://github.com/milantaky/konflux-ui
           - name: revision
-            value: main
+            value: fix/update-e2e-spec-names
           - name: pathInRepo
             value: .integration-tests/tasks/monitor-webhook-logs.yaml
       params:
@@ -222,10 +222,11 @@ spec:
       taskRef:
         resolver: git
         params:
+          # Resolve from this branch while iterating; flip back to konflux-ci/main before merge.
           - name: url
-            value: https://github.com/konflux-ci/konflux-ui
+            value: https://github.com/milantaky/konflux-ui
           - name: revision
-            value: main
+            value: fix/update-e2e-spec-names
           - name: pathInRepo
             value: .integration-tests/tasks/run-e2e-konflux-ui.yaml
       params:
