@@ -340,12 +340,13 @@ spec:
                 SRC="$(params.SOURCE_IMAGE_URL)"
                 DIGEST="$(params.SOURCE_IMAGE_DIGEST)"
                 DEST="$(params.DESTINATION_IMAGE_URL)"
-                # Prefer digest; strip tag when both tag and digest are present
-                # (containers/image does not support name:tag@digest).
+                # Resolve to repo@digest. Append digest first, then strip any tag
+                # (containers/image rejects name:tag@digest).
+                if [[ "${SRC}" != *"@"* ]]; then
+                  SRC="${SRC}@${DIGEST}"
+                fi
                 if [[ "${SRC}" == *":"*"@"* ]]; then
                   SRC="${SRC/:*@/@}"
-                elif [[ "${SRC}" != *"@"* ]]; then
-                  SRC="${SRC}@${DIGEST}"
                 fi
                 echo "Copying docker://${SRC} -> docker://${DEST}"
                 skopeo copy --all "docker://${SRC}" "docker://${DEST}"
