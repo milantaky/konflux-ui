@@ -346,29 +346,27 @@ spec:
               script: |
                 #!/usr/bin/env bash
                 set -euo pipefail
-                SRC="$(params.SOURCE_IMAGE_URL)"
+
+                SRC_TAGGED="$(params.SOURCE_IMAGE_URL)"
                 DIGEST="$(params.SOURCE_IMAGE_DIGEST)"
                 DEST="$(params.DESTINATION_IMAGE_URL)"
-                # Resolve to repo@digest. Append digest first, then strip any tag
-                # (containers/image rejects name:tag@digest).
-                if [[ "${SRC}" != *"@"* ]]; then
-                  SRC="${SRC}@${DIGEST}"
-                fi
-                if [[ "${SRC}" == *":"*"@"* ]]; then
-                  SRC="${SRC/:*@/@}"
-                fi
                 DEST_AUTH="/etc/qe-quay-auth/.dockerconfigjson"
-                if [[ ! -f "${DEST_AUTH}" ]]; then
-                  DEST_AUTH="/etc/qe-quay-auth/.dockercfg"
-                fi
-                if [[ ! -f "${DEST_AUTH}" ]]; then
-                  echo "QE Quay auth file missing in secret quay-repo-katy" >&2
-                  ls -la /etc/qe-quay-auth >&2 || true
-                  exit 1
-                fi
+
+                echo "SRC_TAGGED=${SRC_TAGGED}"
+                echo "DIGEST=${DIGEST}"
+                echo "DEST=${DEST}"
+                echo "DEST_AUTH=${DEST_AUTH}"
+                ls -la /etc/qe-quay-auth
+
+                # IMAGE_URL is always repo:tag; strip tag and pin by digest
+                # (containers/image rejects name:tag@digest).
+                SRC="${SRC_TAGGED%:*}@${DIGEST}"
+                echo "SRC=${SRC}"
+
                 echo "Copying docker://${SRC} -> docker://${DEST}"
                 skopeo copy --all --dest-authfile="${DEST_AUTH}" \
                   "docker://${SRC}" "docker://${DEST}"
+                echo "Copy finished successfully"
       - matrix:
           params:
             - name: PLATFORM
