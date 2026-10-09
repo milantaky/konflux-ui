@@ -34,6 +34,8 @@ spec:
       value: '{"type": "yarn", "path": "."}'
     - name: e2e-output-image
       value: quay.io/redhat-user-workloads/konflux-ui-tenant/konflux-ui/konflux-ui:e2e-{{revision}}
+    - name: e2e-qe-output-image
+      value: quay.io/konflux_ui_qe/konflux-ui-tests:latest
     - name: e2e-dockerfile
       value: Containerfile
     - name: e2e-path-context
@@ -124,6 +126,13 @@ spec:
         description: When "true", omit the build history (history timestamps, layer metadata, etc.) from the resulting image.
       - description: Fully qualified output image for the E2E test runner
         name: e2e-output-image
+        type: string
+      - default: quay.io/konflux_ui_qe/konflux-ui-tests:latest
+        description: >
+          Public QE Quay tag updated after each main push (skopeo copy from e2e-output-image).
+          Requires a dockerconfigjson secret with write access to this repository linked on
+          ServiceAccount build-pipeline-konflux-ui (see e2e-tests/README.md).
+        name: e2e-qe-output-image
         type: string
       - default: Containerfile
         name: e2e-dockerfile
@@ -315,6 +324,45 @@ spec:
             - name: kind
               value: task
           resolver: bundles
+      # Mirror the push-pipeline e2e runner to the public QE Quay :latest tag (KFLUXUI-1731).
+      # Auth: Tekton injects dockerconfigjson secrets linked on build-pipeline-konflux-ui into
+      # ~/.docker/config.json. Create/link a secret with write access to konflux_ui_qe.
+      - name: publish-e2e-qe-image
+        params:
+          - name: SOURCE_IMAGE_URL
+            value: $(tasks.build-e2e-container.results.IMAGE_URL)
+          - name: SOURCE_IMAGE_DIGEST
+            value: $(tasks.build-e2e-container.results.IMAGE_DIGEST)
+          - name: DESTINATION_IMAGE_URL
+            value: $(params.e2e-qe-output-image)
+        runAfter:
+          - apply-tags-e2e
+        taskSpec:
+          params:
+            - name: SOURCE_IMAGE_URL
+              type: string
+            - name: SOURCE_IMAGE_DIGEST
+              type: string
+            - name: DESTINATION_IMAGE_URL
+              type: string
+          steps:
+            - name: skopeo-copy
+              image: registry.access.redhat.com/ubi9/skopeo@sha256:6ebbdfce633f9915a6a99d8ee035d9fd258121aa1acf944229e90696eb353549
+              script: |
+                #!/usr/bin/env bash
+                set -euo pipefail
+                SRC="$(params.SOURCE_IMAGE_URL)"
+                DIGEST="$(params.SOURCE_IMAGE_DIGEST)"
+                DEST="$(params.DESTINATION_IMAGE_URL)"
+                # Prefer digest; strip tag when both tag and digest are present
+                # (containers/image does not support name:tag@digest).
+                if [[ "${SRC}" == *":"*"@"* ]]; then
+                  SRC="${SRC/:*@/@}"
+                elif [[ "${SRC}" != *"@"* ]]; then
+                  SRC="${SRC}@${DIGEST}"
+                fi
+                echo "Copying docker://${SRC} -> docker://${DEST}"
+                skopeo copy --all "docker://${SRC}" "docker://${DEST}"
       - name: build-instrumented-container
         params:
           - name: IMAGE
