@@ -310,9 +310,10 @@ spec:
             - name: kind
               value: task
           resolver: bundles
-      # Mirror the e2e runner to the public QE Quay :latest tag (KFLUXUI-1731).
-      # Auth: Tekton injects dockerconfigjson secrets linked on
-      # build-pipeline-push-new-test-image into ~/.docker/config.json.
+      # Mirror the e2e runner to QE Quay (KFLUXUI-1731).
+      # Destination auth is mounted from quay-repo-katy explicitly: linking alone is
+      # not enough when another quay.io dockerconfig (image-push) already wins the
+      # Tekton-merged ~/.docker/config.json entry for the quay.io host.
       - name: publish-e2e-qe-image
         params:
           - name: SOURCE_IMAGE_URL
@@ -331,9 +332,17 @@ spec:
               type: string
             - name: DESTINATION_IMAGE_URL
               type: string
+          volumes:
+            - name: qe-quay-auth
+              secret:
+                secretName: quay-repo-katy
           steps:
             - name: skopeo-copy
               image: registry.access.redhat.com/ubi9/skopeo@sha256:6ebbdfce633f9915a6a99d8ee035d9fd258121aa1acf944229e90696eb353549
+              volumeMounts:
+                - name: qe-quay-auth
+                  mountPath: /etc/qe-quay-auth
+                  readOnly: true
               script: |
                 #!/usr/bin/env bash
                 set -euo pipefail
@@ -348,8 +357,18 @@ spec:
                 if [[ "${SRC}" == *":"*"@"* ]]; then
                   SRC="${SRC/:*@/@}"
                 fi
+                DEST_AUTH="/etc/qe-quay-auth/.dockerconfigjson"
+                if [[ ! -f "${DEST_AUTH}" ]]; then
+                  DEST_AUTH="/etc/qe-quay-auth/.dockercfg"
+                fi
+                if [[ ! -f "${DEST_AUTH}" ]]; then
+                  echo "QE Quay auth file missing in secret quay-repo-katy" >&2
+                  ls -la /etc/qe-quay-auth >&2 || true
+                  exit 1
+                fi
                 echo "Copying docker://${SRC} -> docker://${DEST}"
-                skopeo copy --all "docker://${SRC}" "docker://${DEST}"
+                skopeo copy --all --dest-authfile="${DEST_AUTH}" \
+                  "docker://${SRC}" "docker://${DEST}"
       - matrix:
           params:
             - name: PLATFORM
