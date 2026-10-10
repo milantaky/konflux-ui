@@ -347,7 +347,7 @@ spec:
               type: string
           steps:
             - name: skopeo-copy
-              image: registry.access.redhat.com/ubi9/skopeo@sha256:6ebbdfce633f9915a6a99d8ee035d9fd258121aa1acf944229e90696eb353549
+              image: registry.access.redhat.com/ubi9/skopeo@sha256:4a6e11dff9b438151056f5d3c3d3c040852d4138c7def4b56280d78a292c7ad9
               script: |
                 #!/usr/bin/env bash
                 set -euo pipefail
