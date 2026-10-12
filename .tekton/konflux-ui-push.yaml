@@ -324,9 +324,6 @@ spec:
             - name: kind
               value: task
           resolver: bundles
-      # Mirror the push-pipeline e2e runner to the public QE Quay :latest tag (KFLUXUI-1731).
-      # Auth: Tekton injects dockerconfigjson secrets linked on build-pipeline-konflux-ui into
-      # ~/.docker/config.json. Create/link a secret with write access to konflux_ui_qe.
       - name: publish-e2e-qe-image
         params:
           - name: SOURCE_IMAGE_URL
@@ -345,25 +342,38 @@ spec:
               type: string
             - name: DESTINATION_IMAGE_URL
               type: string
+          volumes:
+            - name: qe-quay-auth
+              secret:
+                secretName: build-credentials-secret
           steps:
             - name: skopeo-copy
+<<<<<<< Updated upstream
               image: registry.access.redhat.com/ubi9/skopeo@sha256:4a6e11dff9b438151056f5d3c3d3c040852d4138c7def4b56280d78a292c7ad9
+=======
+              image: registry.access.redhat.com/ubi9/skopeo@sha256:6ebbdfce633f9915a6a99d8ee035d9fd258121aa1acf944229e90696eb353549
+              volumeMounts:
+                - name: qe-quay-auth
+                  mountPath: /etc/qe-quay-auth
+                  readOnly: true
+>>>>>>> Stashed changes
               script: |
                 #!/usr/bin/env bash
                 set -euo pipefail
-                SRC="$(params.SOURCE_IMAGE_URL)"
+
+                SRC_TAGGED="$(params.SOURCE_IMAGE_URL)"
                 DIGEST="$(params.SOURCE_IMAGE_DIGEST)"
                 DEST="$(params.DESTINATION_IMAGE_URL)"
-                # Resolve to repo@digest. Append digest first, then strip any tag
+                DEST_AUTH="/etc/qe-quay-auth/.dockerconfigjson"
+
+                # IMAGE_URL is always repo:tag; strip tag and pin by digest
                 # (containers/image rejects name:tag@digest).
-                if [[ "${SRC}" != *"@"* ]]; then
-                  SRC="${SRC}@${DIGEST}"
-                fi
-                if [[ "${SRC}" == *":"*"@"* ]]; then
-                  SRC="${SRC/:*@/@}"
-                fi
+                SRC="${SRC_TAGGED%:*}@${DIGEST}"
+
                 echo "Copying docker://${SRC} -> docker://${DEST}"
-                skopeo copy --all "docker://${SRC}" "docker://${DEST}"
+                skopeo copy --all --dest-authfile="${DEST_AUTH}" \
+                  "docker://${SRC}" "docker://${DEST}"
+                echo "Copy finished successfully"
       - name: build-instrumented-container
         params:
           - name: IMAGE
