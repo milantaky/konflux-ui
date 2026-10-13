@@ -54,3 +54,6 @@ Coverage upload uses `coverport-cli` which:
 
 - **No coverage data**: Check `window.__coverage__` exists in browser console
 - **Empty reports**: Ensure testing against instrumented build, not production
+- **Empty `out.json` (`{}`) with instrumented bundle loaded**: Confirm
+  `webpack.instrumented.config.js` has `optimization.minimize: false`. Production
+  Terser minify can break Istanbul so `window.__coverage__` is never set.

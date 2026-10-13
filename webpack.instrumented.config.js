@@ -7,6 +7,9 @@ import prodConfig from './webpack.prod.config.js';
  *
  * Extends the production config but replaces swc-loader with babel-loader + istanbul
  * to instrument the code for coverage collection via window.__coverage__.
+ *
+ * JS minification is disabled: Terser can strip or break Istanbul's runtime so
+ * window.__coverage__ is missing and Cypress writes an empty .nyc_output/out.json.
  */
 export default mergeWithRules({
   module: {
@@ -16,6 +19,9 @@ export default mergeWithRules({
     },
   },
 })(prodConfig, {
+  optimization: {
+    minimize: false,
+  },
   module: {
     rules: [
       {
