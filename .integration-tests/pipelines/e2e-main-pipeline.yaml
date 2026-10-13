@@ -3,7 +3,7 @@ apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
   name: e2e-main-pipeline
-  namespace: konflux-ui-tenant
+  namespace: mtakac-tenant
 spec:
   params:
     - name: SNAPSHOT
@@ -61,8 +61,8 @@ spec:
     - name: test-image-repository
       description: >-
         E2E test image repository without tag. Must match e2e-output-image from
-        the konflux-ui build pipeline (e2e-on-pr-<sha> for pull_request, e2e-<sha> for push).
-      default: 'quay.io/redhat-user-workloads/konflux-ui-tenant/konflux-ui/konflux-ui'
+        the slack-message build pipeline (e2e-on-pr-<sha> for pull_request, e2e-<sha> for push).
+      default: 'quay.io/redhat-user-workloads-stage/mtakac-tenant/slack-message'
       type: string
   tasks:
     - name: test-metadata
@@ -162,9 +162,9 @@ spec:
         resolver: git
         params:
           - name: url
-            value: https://github.com/konflux-ci/konflux-ui
+            value: https://github.com/milantaky/konflux-ui
           - name: revision
-            value: main
+            value: fix/slack-message
           - name: pathInRepo
             value: .integration-tests/tasks/monitor-webhook-logs.yaml
       params:
@@ -223,9 +223,9 @@ spec:
         resolver: git
         params:
           - name: url
-            value: https://github.com/konflux-ci/konflux-ui
+            value: https://github.com/milantaky/konflux-ui
           - name: revision
-            value: main
+            value: fix/slack-message
           - name: pathInRepo
             value: .integration-tests/tasks/run-e2e-konflux-ui.yaml
       params:
@@ -324,9 +324,9 @@ spec:
         resolver: git
         params:
           - name: url
-            value: https://github.com/konflux-ci/konflux-ui
+            value: https://github.com/milantaky/konflux-ui
           - name: revision
-            value: main
+            value: fix/slack-message
           - name: pathInRepo
             value: .integration-tests/tasks/send-slack-notification.yaml
       params:

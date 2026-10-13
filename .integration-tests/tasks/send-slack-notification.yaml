@@ -107,23 +107,25 @@ spec:
         # Send Slack notification
         echo "=== Sending Slack notification ==="
 
-        # Escape backslashes and quotes for JSON string interpolation
-        PAYLOAD=$(printf '%s' "${MESSAGE}" | sed 's/\\/\\\\/g; s/"/\\"/g')
+        echo "COMMENTED OUT: MESSAGE: ${MESSAGE}"
+        # UNCOMMENT
+        # # Escape backslashes and quotes for JSON string interpolation
+        # PAYLOAD=$(printf '%s' "${MESSAGE}" | sed 's/\\/\\\\/g; s/"/\\"/g')
 
-        if ! RESPONSE=$(curl -s --max-time 10 -X POST "${SLACK_WEBHOOK_URL}" \
-          -H "Content-Type: application/json; charset=utf-8" \
-          -d "{\"text\": \"${PAYLOAD}\"}"); then
-          echo "⚠️ Failed to send Slack notification (curl connection error)"
-          [[ -n "${RESPONSE}" ]] && echo "${RESPONSE}"
-          exit 1
-        fi
-        echo "Slack webhook response: ${RESPONSE}"
+        # if ! RESPONSE=$(curl -s --max-time 10 -X POST "${SLACK_WEBHOOK_URL}" \
+        #   -H "Content-Type: application/json; charset=utf-8" \
+        #   -d "{\"text\": \"${PAYLOAD}\"}"); then
+        #   echo "⚠️ Failed to send Slack notification (curl connection error)"
+        #   [[ -n "${RESPONSE}" ]] && echo "${RESPONSE}"
+        #   exit 1
+        # fi
+        # echo "Slack webhook response: ${RESPONSE}"
 
-        # Check if message was sent successfully
-        if [[ "${RESPONSE}" == "ok" ]]; then
-          echo "✅ Slack notification sent successfully"
-        else
-          echo "⚠️ Failed to send Slack notification"
-          echo "${RESPONSE}"
-          exit 1
-        fi
+        # # Check if message was sent successfully
+        # if [[ "${RESPONSE}" == "ok" ]]; then
+        #   echo "✅ Slack notification sent successfully"
+        # else
+        #   echo "⚠️ Failed to send Slack notification"
+        #   echo "${RESPONSE}"
+        #   exit 1
+        # fi
