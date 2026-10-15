@@ -3845,11 +3845,11 @@ __metadata:
   linkType: hard
 
 "@patternfly/react-code-editor@npm:^6.5.1":
-  version: 6.6.1
-  resolution: "@patternfly/react-code-editor@npm:6.6.1"
+  version: 6.6.2
+  resolution: "@patternfly/react-code-editor@npm:6.6.2"
   dependencies:
     "@monaco-editor/react": "npm:^4.7.0"
-    "@patternfly/react-core": "npm:^6.6.1"
+    "@patternfly/react-core": "npm:^6.6.2"
     "@patternfly/react-icons": "npm:^6.6.1"
     "@patternfly/react-styles": "npm:^6.6.1"
     react-dropzone: "npm:14.3.5"
@@ -3857,7 +3857,7 @@ __metadata:
   peerDependencies:
     react: ^17 || ^18 || ^19
     react-dom: ^17 || ^18 || ^19
-  checksum: 10/8c3a815e5d5a1713bd4ab6272f0d86011442cf3776e69597b81bf32053373e3cf0ee29f74c567f895067702770ec6d9dc556295ddbcb256c1b9075e3f98a264b
+  checksum: 10/b6e98bbf1ef17ad1081ca7c5003ef427998104ac74a4c26f0286880678817f0a8ccb4fdd83eb8cd652c74ac5086ada62bbf1b52f836f88306844a8e8972dd6e3
   languageName: node
   linkType: hard
 
@@ -3909,6 +3909,23 @@ __metadata:
     react: ^17 || ^18 || ^19
     react-dom: ^17 || ^18 || ^19
   checksum: 10/43d2f77ebc990b857e5c62393292d52722b2ef551ddc843cb23a89d0b816e423ba1ca4b895773dba8812e087fbf7b613f0957885564de3b0c8db35f9a4c4810a
+  languageName: node
+  linkType: hard
+
+"@patternfly/react-core@npm:^6.6.2":
+  version: 6.6.2
+  resolution: "@patternfly/react-core@npm:6.6.2"
+  dependencies:
+    "@patternfly/react-icons": "npm:^6.6.1"
+    "@patternfly/react-styles": "npm:^6.6.1"
+    "@patternfly/react-tokens": "npm:^6.6.1"
+    focus-trap: "npm:7.6.6"
+    react-dropzone: "npm:^14.3.5"
+    tslib: "npm:^2.8.1"
+  peerDependencies:
+    react: ^17 || ^18 || ^19
+    react-dom: ^17 || ^18 || ^19
+  checksum: 10/5dad8fce985e4fcbd64eb6a95de47ec253fa97dc6fe3128a4910621d196816bf4a7a93bbca154c18842c0a808abf7b304da7bc0ffec01d077edf4a956791e77a
   languageName: node
   linkType: hard
 
