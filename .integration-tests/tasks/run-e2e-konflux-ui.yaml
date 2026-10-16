@@ -88,6 +88,12 @@ spec:
       secret:
         secretName: $(params.codecov-credentials-secret)
         optional: true
+    # Kind kubeconfig (same secret patch-konflux-ui-image mounts). Prefer volume
+    # mount over kubectl-get+base64 — avoids CA corruption / TLS verify failures.
+    - name: cluster-credentials
+      secret:
+        secretName: kfg-$(params.pipeline-run-name)
+        optional: true
   stepTemplate:
     volumeMounts:
       - name: test-artifacts
@@ -536,11 +542,10 @@ spec:
           operator: notin
           values: ['periodic-stage']
       image: quay.io/konflux-ci/tekton-integration-catalog/utils@sha256:79707a56aa34a59f8ebb97db855114b840cbbf60bece4a0edf8ef8c7d7d5acd1
-      env:
-        - name: TEKTON_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
+      volumeMounts:
+        - name: cluster-credentials
+          mountPath: /cluster-credentials
+          readOnly: true
       script: |
         #!/usr/bin/env bash
         set -euo pipefail
@@ -549,16 +554,36 @@ spec:
         mkdir -p "${DUMP_DIR}"
         NS=user-ns2
 
-        PIPELINE_RUN_NAME="$(params.pipeline-run-name)"
-        SECRET_NAME="kfg-${PIPELINE_RUN_NAME}"
-        echo "Loading kind kubeconfig from secret ${SECRET_NAME} in ${TEKTON_NAMESPACE}"
-
-        if ! kubectl get secret "${SECRET_NAME}" -n "${TEKTON_NAMESPACE}" \
-          -o jsonpath='{.data.kubeconfig}' | base64 -d | install -m 0600 /dev/stdin /tmp/kubeconfig; then
-          echo "WARN: could not load kind kubeconfig — skipping dump" | tee "${DUMP_DIR}/error.txt"
+        SRC=/cluster-credentials/kubeconfig
+        if [[ ! -f "${SRC}" ]]; then
+          echo "WARN: ${SRC} missing — skipping dump" | tee "${DUMP_DIR}/error.txt"
+          ls -la /cluster-credentials >> "${DUMP_DIR}/error.txt" 2>&1 || true
           exit 0
         fi
+
+        # Writable copy: kind kubeconfigs often fail CA verify from this image
+        # ("x509: certificate signed by unknown authority" / rsa verification error).
+        # For debug dumps, skip TLS verify (same cluster patch-* already reached).
+        install -m 0600 "${SRC}" /tmp/kubeconfig
         export KUBECONFIG=/tmp/kubeconfig
+        CLUSTER_NAME=$(kubectl config view --raw -o jsonpath='{.clusters[0].name}' 2>/dev/null || true)
+        if [[ -n "${CLUSTER_NAME}" ]]; then
+          kubectl config set-cluster "${CLUSTER_NAME}" --insecure-skip-tls-verify=true
+          # Clear embedded CA so kubectl does not still try to verify it
+          kubectl config unset "clusters.${CLUSTER_NAME}.certificate-authority-data" 2>/dev/null || true
+          kubectl config unset "clusters.${CLUSTER_NAME}.certificate-authority" 2>/dev/null || true
+        fi
+
+        if ! kubectl get --raw=/readyz >/dev/null 2>"${DUMP_DIR}/connect-error.txt"; then
+          echo "WARN: kind API still unreachable after insecure-skip-tls-verify" | tee -a "${DUMP_DIR}/error.txt"
+          cat "${DUMP_DIR}/connect-error.txt" >> "${DUMP_DIR}/error.txt" || true
+          kubectl config view --raw > "${DUMP_DIR}/kubeconfig-redacted.yaml" 2>&1 || true
+          # Redact tokens/certs from the dumped view
+          sed -i -E 's/(token:|client-certificate-data:|client-key-data:).*/\1 <redacted>/' \
+            "${DUMP_DIR}/kubeconfig-redacted.yaml" 2>/dev/null || true
+          exit 0
+        fi
+        rm -f "${DUMP_DIR}/connect-error.txt"
 
         echo "=== Dumping kind cluster state (ns=${NS}) ==="
         {
@@ -569,8 +594,7 @@ spec:
           kubectl get nodes -o wide || true
           echo
           echo "# ${NS} all"
-          kubectl get all,pipelinerun,taskrun,pipelineresource,configmap,secret -n "${NS}" -o wide 2>/dev/null || \
-            kubectl get all,pipelinerun,taskrun -n "${NS}" -o wide || true
+          kubectl get all,pipelinerun,taskrun,configmap -n "${NS}" -o wide || true
         } > "${DUMP_DIR}/overview.txt" 2>&1 || true
 
         kubectl get pipelinerun -n "${NS}" -o yaml > "${DUMP_DIR}/pipelineruns.yaml" 2>&1 || \
