@@ -130,9 +130,9 @@ spec:
         - name: oci-credentials
           value: $(params.oci-credentials-secret)
         - name: cpus
-          value: '4'
+          value: '8'
         - name: memory
-          value: '16'
+          value: '32'
 
     - name: deploy-konflux
       runAfter:

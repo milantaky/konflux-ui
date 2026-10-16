@@ -526,6 +526,85 @@ spec:
           exit 0
         fi
 
+    # Dump kind cluster state into /artifacts so it is pushed to OCI even when
+    # e2e fails (run-e2e-test has onError: continue). Captures user-ns2 PLRs/pods
+    # before deprovision tears the cluster down.
+    - name: dump-kind-debug
+      onError: continue
+      when:
+        - input: '$(params.job-type)'
+          operator: notin
+          values: ['periodic-stage']
+      image: quay.io/konflux-ci/tekton-integration-catalog/utils@sha256:79707a56aa34a59f8ebb97db855114b840cbbf60bece4a0edf8ef8c7d7d5acd1
+      env:
+        - name: TEKTON_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        DUMP_DIR=/artifacts/kind-dump
+        mkdir -p "${DUMP_DIR}"
+        NS=user-ns2
+
+        PIPELINE_RUN_NAME="$(params.pipeline-run-name)"
+        SECRET_NAME="kfg-${PIPELINE_RUN_NAME}"
+        echo "Loading kind kubeconfig from secret ${SECRET_NAME} in ${TEKTON_NAMESPACE}"
+
+        if ! kubectl get secret "${SECRET_NAME}" -n "${TEKTON_NAMESPACE}" \
+          -o jsonpath='{.data.kubeconfig}' | base64 -d | install -m 0600 /dev/stdin /tmp/kubeconfig; then
+          echo "WARN: could not load kind kubeconfig — skipping dump" | tee "${DUMP_DIR}/error.txt"
+          exit 0
+        fi
+        export KUBECONFIG=/tmp/kubeconfig
+
+        echo "=== Dumping kind cluster state (ns=${NS}) ==="
+        {
+          echo "# namespaces"
+          kubectl get ns -o wide || true
+          echo
+          echo "# nodes"
+          kubectl get nodes -o wide || true
+          echo
+          echo "# ${NS} all"
+          kubectl get all,pipelinerun,taskrun,pipelineresource,configmap,secret -n "${NS}" -o wide 2>/dev/null || \
+            kubectl get all,pipelinerun,taskrun -n "${NS}" -o wide || true
+        } > "${DUMP_DIR}/overview.txt" 2>&1 || true
+
+        kubectl get pipelinerun -n "${NS}" -o yaml > "${DUMP_DIR}/pipelineruns.yaml" 2>&1 || \
+          echo "no pipelineruns" > "${DUMP_DIR}/pipelineruns.yaml"
+        kubectl get taskrun -n "${NS}" -o yaml > "${DUMP_DIR}/taskruns.yaml" 2>&1 || \
+          echo "no taskruns" > "${DUMP_DIR}/taskruns.yaml"
+        kubectl get pods -n "${NS}" -o wide > "${DUMP_DIR}/pods.txt" 2>&1 || \
+          echo "no pods" > "${DUMP_DIR}/pods.txt"
+        kubectl get pods -n "${NS}" -o yaml > "${DUMP_DIR}/pods.yaml" 2>&1 || true
+        kubectl describe pods -n "${NS}" > "${DUMP_DIR}/pods-describe.txt" 2>&1 || true
+        kubectl describe pipelinerun -n "${NS}" > "${DUMP_DIR}/pipelineruns-describe.txt" 2>&1 || true
+        kubectl describe taskrun -n "${NS}" > "${DUMP_DIR}/taskruns-describe.txt" 2>&1 || true
+
+        # Per-pod logs (last 200 lines); skip if no pods
+        mkdir -p "${DUMP_DIR}/pod-logs"
+        while IFS= read -r pod; do
+          [[ -z "${pod}" ]] && continue
+          kubectl logs -n "${NS}" "${pod}" --all-containers --tail=200 \
+            > "${DUMP_DIR}/pod-logs/${pod}.log" 2>&1 || true
+          kubectl logs -n "${NS}" "${pod}" --all-containers --previous --tail=200 \
+            > "${DUMP_DIR}/pod-logs/${pod}.previous.log" 2>&1 || true
+        done < <(kubectl get pods -n "${NS}" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)
+
+        # Also dump konflux-ui / pipelines-as-code / tekton-pipelines if present (webhook/smee context)
+        for extra_ns in konflux-ui pipelines-as-code tekton-pipelines; do
+          if kubectl get ns "${extra_ns}" >/dev/null 2>&1; then
+            kubectl get pods -n "${extra_ns}" -o wide > "${DUMP_DIR}/pods-${extra_ns}.txt" 2>&1 || true
+            kubectl get deploy,svc -n "${extra_ns}" -o wide > "${DUMP_DIR}/workloads-${extra_ns}.txt" 2>&1 || true
+          fi
+        done
+
+        echo "Dump written to ${DUMP_DIR}:"
+        find "${DUMP_DIR}" -type f -printf '%p (%s bytes)\n' | sort || ls -lahR "${DUMP_DIR}"
+
     - name: upload-coverage
       onError: continue
       image: quay.io/konflux-ci/konflux-devprod/coverport-cli@sha256:bd8dc5b1048d3385d77a17954638e1b8ae1ac2236a65560612e535e5d0888e27
