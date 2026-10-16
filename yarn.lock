@@ -3912,6 +3912,23 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@patternfly/react-core@npm:^6.6.2":
+  version: 6.6.2
+  resolution: "@patternfly/react-core@npm:6.6.2"
+  dependencies:
+    "@patternfly/react-icons": "npm:^6.6.1"
+    "@patternfly/react-styles": "npm:^6.6.1"
+    "@patternfly/react-tokens": "npm:^6.6.1"
+    focus-trap: "npm:7.6.6"
+    react-dropzone: "npm:^14.3.5"
+    tslib: "npm:^2.8.1"
+  peerDependencies:
+    react: ^17 || ^18 || ^19
+    react-dom: ^17 || ^18 || ^19
+  checksum: 10/5dad8fce985e4fcbd64eb6a95de47ec253fa97dc6fe3128a4910621d196816bf4a7a93bbca154c18842c0a808abf7b304da7bc0ffec01d077edf4a956791e77a
+  languageName: node
+  linkType: hard
+
 "@patternfly/react-drag-drop@npm:^6.5.1":
   version: 6.6.1
   resolution: "@patternfly/react-drag-drop@npm:6.6.1"
@@ -4007,11 +4024,11 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@patternfly/react-table@npm:6.6.1":
-  version: 6.6.1
-  resolution: "@patternfly/react-table@npm:6.6.1"
+"@patternfly/react-table@npm:6.6.2":
+  version: 6.6.2
+  resolution: "@patternfly/react-table@npm:6.6.2"
   dependencies:
-    "@patternfly/react-core": "npm:^6.6.1"
+    "@patternfly/react-core": "npm:^6.6.2"
     "@patternfly/react-icons": "npm:^6.6.1"
     "@patternfly/react-styles": "npm:^6.6.1"
     "@patternfly/react-tokens": "npm:^6.6.1"
@@ -4020,7 +4037,7 @@ __metadata:
   peerDependencies:
     react: ^17 || ^18 || ^19
     react-dom: ^17 || ^18 || ^19
-  checksum: 10/016cadf04e7ad16c1ee7f6c5f26e412ac7bed6a2286ce7f5a6bf97310fb5acb5ef2e2f18f19f208d7546a1209ead2fa99ef0c351183e6f1c911e938d04295c08
+  checksum: 10/e18c8433b9c0038f41c04dfe86ab7152f3c4203f18fd8c15527ed757df0fff83aec12271ae9bbe51f41665b6111c1b8339349a61efa9f972f5f5233c0e933a5e
   languageName: node
   linkType: hard
 
@@ -13949,7 +13966,7 @@ __metadata:
     "@patternfly/react-icons": "npm:6.6.1"
     "@patternfly/react-log-viewer": "npm:6.5.0"
     "@patternfly/react-styles": "npm:6.6.1"
-    "@patternfly/react-table": "npm:6.6.1"
+    "@patternfly/react-table": "npm:6.6.2"
     "@patternfly/react-tokens": "npm:6.6.0"
     "@patternfly/react-topology": "npm:6.6.0"
     "@patternfly/react-virtualized-extension": "npm:6.2.0"
