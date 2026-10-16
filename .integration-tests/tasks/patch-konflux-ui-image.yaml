@@ -138,21 +138,3 @@ spec:
         kubectl get deployment proxy -n konflux-ui \
           -o jsonpath='{range .spec.template.spec.initContainers[*]}{.name}={.image}{"\n"}{end}'
         echo "=== UI image patch complete ==="
-
-        # deploy-konflux-ci rewrites smee sidecar DOWNSTREAM to http://<node-ip>:8180,
-        # but PaC is NodePort (e.g. 8180→30012), so forwards time out. Point the
-        # sidecar at the Service ClusterIP:8180 instead (works in-cluster).
-        echo "=== Restoring smee → PaC downstream (ClusterIP) ==="
-        if kubectl get deployment/gosmee-client -n smee-client &>/dev/null \
-          && kubectl get svc pipelines-as-code-controller -n pipelines-as-code &>/dev/null; then
-          PAC_IP=$(kubectl get svc pipelines-as-code-controller -n pipelines-as-code \
-            -o jsonpath='{.spec.clusterIP}')
-          PAC_DOWNSTREAM="http://${PAC_IP}:8180"
-          echo "DOWNSTREAM_SERVICE_URL=${PAC_DOWNSTREAM}"
-          kubectl set env deployment/gosmee-client -n smee-client \
-            -c health-check-sidecar \
-            "DOWNSTREAM_SERVICE_URL=${PAC_DOWNSTREAM}"
-          kubectl rollout status deployment/gosmee-client -n smee-client --timeout=3m
-        else
-          echo "WARNING: smee or PaC service missing; skipping downstream patch"
-        fi
