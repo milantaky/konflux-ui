@@ -111,6 +111,10 @@ export class DetailsTab {
   // retries, since the UI may not update without a refresh. Uses recursion
   // instead of a loop because Cypress commands are asynchronous and don't
   // support try/catch for flow control.
+  //
+  // On LOCAL_CLUSTER (kind), never reload: a full reload while build pods are
+  // saturating the node frequently loses :9443 (ECONNREFUSED / chrome-error)
+  // and the rest of the suite cannot recover. Fail clearly instead.
   static waitUntilStatusIsNotRunning(
     timeoutDuration: number = 1800000, // 30 minutes
     interval: number = 60000, // 60 seconds
@@ -121,6 +125,7 @@ export class DetailsTab {
     }
 
     const maxAttempts = Math.max(1, Math.floor(timeoutDuration / interval));
+    const isLocalCluster = Boolean(Cypress.expose('LOCAL_CLUSTER'));
 
     const checkStatus = (attempt: number) => {
       cy.get(pipelinerunsTabPO.statusPO)
@@ -131,11 +136,16 @@ export class DetailsTab {
             return;
           }
           if (attempt >= maxAttempts) {
+            if (isLocalCluster) {
+              assert.fail(
+                `Pipelinerun still "${statusText.trim()}" after ${timeoutDuration}ms on local kind; ` +
+                  'skipping page reload (reload drops the UI under build load).',
+              );
+            }
             cy.log(
               `Status is "${statusText}". Reloading page (${retries - 1} ${retries - 1 === 1 ? 'retry' : 'retries'} remaining).`,
             );
             cy.reload();
-            // 180000 ms = 3 minutes
             this.waitUntilStatusIsNotRunning(timeoutDuration, interval, retries - 1);
             return;
           }
@@ -208,7 +218,11 @@ export class DetailsTab {
     allTaskLogs = true,
     expectedStatus = 'Succeeded',
   ) {
-    DetailsTab.waitUntilStatusIsNotRunning(timeoutDuration);
+    // Kind builds are slower and we cannot reload; allow a longer single poll window.
+    const effectiveTimeout = Cypress.expose('LOCAL_CLUSTER')
+      ? Math.max(timeoutDuration, 2700000) // 45 minutes
+      : timeoutDuration;
+    DetailsTab.waitUntilStatusIsNotRunning(effectiveTimeout);
     LogsTab.downloadAllTaskLogs(allTaskLogs);
     UIhelper.verifyLabelAndValue('Status', expectedStatus);
   }
