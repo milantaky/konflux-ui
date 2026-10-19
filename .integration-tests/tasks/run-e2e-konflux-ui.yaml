@@ -182,32 +182,18 @@ spec:
         echo "PR revision: ${GIT_REVISION}"
         echo "Target branch: ${TARGET_BRANCH}"
 
-        # PR overlay applies only to fork -> upstream PRs (same as pr_check scope on konflux-ci/konflux-ui).
-        if [ "${SOURCE_REPO_URL}" = "${TARGET_REPO_URL}" ]; then
-          echo "Same-repo PR — skipping e2e overlay, run-e2e will use image sources"
-          exit 0
-        fi
-
         git config --global init.defaultBranch main
         git init /tmp/repo
         cd /tmp/repo
         git remote add origin "${SOURCE_REPO_URL}"
 
-        echo "Fetching PR revision ${GIT_REVISION} from fork..."
+        echo "Fetching PR revision ${GIT_REVISION}..."
         git fetch --depth=1 origin "${GIT_REVISION}"
-        git remote add upstream "${TARGET_REPO_URL}"
-        echo "Fetching upstream/${TARGET_BRANCH}..."
-        git fetch --depth=1 upstream \
-          "refs/heads/${TARGET_BRANCH}:refs/remotes/upstream/${TARGET_BRANCH}"
-        echo "Fetch complete"
+        git checkout -q "${GIT_REVISION}"
 
-        if git diff --quiet "upstream/${TARGET_BRANCH}" "${GIT_REVISION}" -- e2e-tests/; then
-          echo "No e2e-tests/ changes detected — run-e2e will use image sources"
-          exit 0
-        fi
-
-        echo "e2e-tests/ changed — staging PR sources at /e2e"
-        git checkout "${GIT_REVISION}" -- e2e-tests/
+        # Prefer overlaying PR e2e-tests/ so wait/helper fixes apply without
+        # waiting for a rebuilt e2e image (important for same-repo feature branches).
+        echo "e2e-tests/ — staging PR sources at /e2e"
         cp -a e2e-tests/. /e2e/
 
         # run-e2e-test runs as non-root (OpenShift arbitrary UID); root-owned files block yarn install.
@@ -292,7 +278,7 @@ spec:
         echo "=== Selecting E2E test sources ==="
         SPEC_FILE="$(params.spec-file)"
 
-        # prepare-e2e-sources stages PR e2e-tests/ at /e2e when the folder changed; otherwise /e2e stays empty.
+        # prepare-e2e-sources stages PR e2e-tests/ at /e2e; otherwise /e2e stays empty.
         if [ -n "$(ls -A /e2e 2>/dev/null)" ]; then
           echo "PR e2e sources detected at /e2e — installing dependencies"
           cd /e2e

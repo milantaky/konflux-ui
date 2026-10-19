@@ -233,7 +233,7 @@ spec:
     # konflux-ui image name, digest pins). Patch proxy to the instrumented
     # (coverage) or SNAPSHOT image from format-instrumented-ui-image.
     # Also fixes smee→PaC downstream (deploy points at node-ip:8180; PaC is
-    # NodePort so that hangs — use Service ClusterIP instead).
+    # NodePort so that hangs — use in-cluster Service DNS instead).
     - name: patch-konflux-ui-image
       runAfter:
         - deploy-konflux
