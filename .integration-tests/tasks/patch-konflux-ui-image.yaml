@@ -179,8 +179,7 @@ spec:
             if command -v jq >/dev/null 2>&1; then
               jq '(.webhooks // []) |= map(.failurePolicy = "Ignore")'
             else
-              python3 -c 'import json,sys;d=json.load(sys.stdin);ws=d.get("webhooks")or[];
-[w.update({"failurePolicy":"Ignore"})for w in ws];json.dump(d,sys.stdout)'
+              python3 -c 'import json,sys;d=json.load(sys.stdin);ws=d.get("webhooks")or[];[w.update({"failurePolicy":"Ignore"}) for w in ws];json.dump(d,sys.stdout)'
             fi
           }
           for kind in mutatingwebhookconfiguration validatingwebhookconfiguration; do
