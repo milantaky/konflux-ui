@@ -154,3 +154,46 @@ spec:
         else
           echo "WARNING: smee or PaC service missing; skipping downstream patch"
         fi
+
+        # Kind e2e: Kyverno admission often flaps under build load (OOM/restart).
+        # With failurePolicy=Fail, "connection refused" aborts TaskRun pod creates
+        # mid-pipeline (e.g. deprecated-base-image-check) and fails the suite.
+        # Wait for Ready, give the controller more memory, and set failurePolicy
+        # to Ignore so brief webhook outages do not kill PipelineRuns.
+        echo "=== Hardening Kyverno for kind e2e ==="
+        if kubectl get deployment/kyverno-admission-controller -n kyverno &>/dev/null; then
+          # More memory so admission survives concurrent build TaskRuns on kind.
+          kubectl set resources deployment/kyverno-admission-controller -n kyverno \
+            --requests=cpu=100m,memory=512Mi \
+            --limits=cpu=1,memory=1Gi || true
+
+          if ! kubectl rollout status deployment/kyverno-admission-controller -n kyverno --timeout=5m; then
+            echo "Kyverno rollout unhealthy — restarting admission controller"
+            kubectl rollout restart deployment/kyverno-admission-controller -n kyverno
+          fi
+          kubectl wait --for=condition=Available \
+            deployment/kyverno-admission-controller -n kyverno --timeout=5m
+
+          # Prefer Ignore over Fail when the webhook is temporarily unreachable.
+          set_ignore_policy() {
+            if command -v jq >/dev/null 2>&1; then
+              jq '(.webhooks // []) |= map(.failurePolicy = "Ignore")'
+            else
+              python3 -c 'import json,sys;d=json.load(sys.stdin);ws=d.get("webhooks")or[];
+[w.update({"failurePolicy":"Ignore"})for w in ws];json.dump(d,sys.stdout)'
+            fi
+          }
+          for kind in mutatingwebhookconfiguration validatingwebhookconfiguration; do
+            for wh in $(kubectl get "${kind}" -o name 2>/dev/null | grep -i kyverno || true); do
+              echo "Patching failurePolicy=Ignore on ${wh}"
+              kubectl get "${wh}" -o json | set_ignore_policy | kubectl apply -f - || true
+            done
+          done
+
+          echo "Kyverno pods:"
+          kubectl get pods -n kyverno -o wide || true
+          echo "kyverno-svc endpoints:"
+          kubectl get endpoints -n kyverno kyverno-svc -o wide || true
+        else
+          echo "WARNING: kyverno-admission-controller not found; skipping Kyverno harden"
+        fi
