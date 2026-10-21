@@ -1,7 +1,7 @@
 # Google only keeps the latest stable .deb in the apt pool; older pins 404.
 ARG CHROME_VERSION='155.0.8059.84-1'
 
-FROM cypress/factory:7.2.2
+FROM cypress/factory:8.6.1
 
 RUN apt update && \
     apt install curl jq python3 python3-venv python3-pip xauth skopeo -y
