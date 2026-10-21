@@ -112,9 +112,10 @@ export class DetailsTab {
   // instead of a loop because Cypress commands are asynchronous and don't
   // support try/catch for flow control.
   //
-  // On LOCAL_CLUSTER (kind), never reload: a full reload while build pods are
-  // saturating the node frequently loses :9443 (ECONNREFUSED / chrome-error)
-  // and the rest of the suite cannot recover. Fail clearly instead.
+  // On LOCAL_CLUSTER (kind), the status badge often stays "Running" after the
+  // PipelineRun has already Succeeded (stale k8s watch under build load). Poll
+  // the HAC/k8s API instead; once terminal, remount details (visit is safe
+  // after builds finish — unlike reload mid-build, which drops :9443).
   static waitUntilStatusIsNotRunning(
     timeoutDuration: number = 1800000, // 30 minutes
     interval: number = 60000, // 60 seconds
@@ -124,8 +125,12 @@ export class DetailsTab {
       assert.fail('Pipelinerun is still running after maximum retries');
     }
 
+    if (Cypress.expose('LOCAL_CLUSTER')) {
+      DetailsTab.waitUntilFinishedOnLocalCluster(timeoutDuration, interval);
+      return;
+    }
+
     const maxAttempts = Math.max(1, Math.floor(timeoutDuration / interval));
-    const isLocalCluster = Boolean(Cypress.expose('LOCAL_CLUSTER'));
 
     const checkStatus = (attempt: number) => {
       cy.get(pipelinerunsTabPO.statusPO)
@@ -136,31 +141,6 @@ export class DetailsTab {
             return;
           }
           if (attempt >= maxAttempts) {
-            if (isLocalCluster) {
-              const failMsg =
-                `Pipelinerun still "${statusText.trim()}" after ${timeoutDuration}ms on local kind; ` +
-                'skipping page reload (reload drops the UI under build load). ' +
-                'Check Cypress screenshots and /artifacts/kind-debug for which TaskRun hung.';
-              // Capture which TaskRuns are still Running before kind is torn down
-              // (kubectl dump also lands in /artifacts/kind-debug from the Task).
-              cy.screenshot('plr-still-running-details');
-              cy.get('body').then(($body) => {
-                if ($body.find(pipelinerunsTabPO.clickTaskRunsTab).length > 0) {
-                  TaskRunsTab.goToTaskrunsTab();
-                  cy.get('table, [data-test="taskrun-status"]', { timeout: 15000 })
-                    .first()
-                    .invoke('text')
-                    .then((taskText) => {
-                      cy.log(`TaskRuns at timeout:\n${taskText}`);
-                    });
-                  cy.screenshot('plr-still-running-taskruns');
-                }
-              });
-              cy.then(() => {
-                assert.fail(failMsg);
-              });
-              return;
-            }
             cy.log(
               `Status is "${statusText}". Reloading page (${retries - 1} ${retries - 1 === 1 ? 'retry' : 'retries'} remaining).`,
             );
@@ -174,6 +154,63 @@ export class DetailsTab {
     };
 
     checkStatus(0);
+  }
+
+  /** Kind-only: wait on API Succeeded condition, then remount the details view. */
+  private static waitUntilFinishedOnLocalCluster(timeoutDuration: number, interval: number) {
+    const maxAttempts = Math.max(1, Math.floor(timeoutDuration / interval));
+
+    cy.url().then((detailsUrl) => {
+      const plrName = detailsUrl.split('/pipelineruns/')[1]?.split(/[/?#]/)[0];
+      expect(plrName, 'pipeline run name from URL').to.be.a('string').and.not.be.empty;
+
+      const checkApi = (attempt: number) => {
+        APIHelper.requestHACAPI({
+          url: hacAPIEndpoints.pipelinerun(plrName as string),
+          failOnStatusCode: false,
+          timeout: 30000,
+        }).then((resp) => {
+          const cond = (
+            (resp.body?.status?.conditions as
+              { type?: string; status?: string; reason?: string }[] | undefined) || []
+          ).find((c) => c.type === 'Succeeded');
+          // Tekton: status Unknown (+ reason Running) while in progress; True/False when done.
+          const isTerminal = Boolean(cond && cond.status && cond.status !== 'Unknown');
+
+          if (isTerminal) {
+            cy.log(
+              `Kind: API ${plrName} finished (${cond?.status}/${cond?.reason}); remounting details view.`,
+            );
+            cy.visit(detailsUrl, { failOnStatusCode: false });
+            cy.get(pipelinerunsTabPO.statusPO, { timeout: 120000 })
+              .should('be.visible')
+              .invoke('text')
+              .should((text) => {
+                expect(text, 'status after remount').to.not.include('Pending');
+                expect(text, 'status after remount').to.not.include('Running');
+              });
+            return;
+          }
+
+          if (attempt >= maxAttempts) {
+            cy.screenshot('plr-still-running-details');
+            assert.fail(
+              `Pipelinerun ${plrName} still in progress in API after ${timeoutDuration}ms on local kind ` +
+                `(${cond?.status ?? '?'}/${cond?.reason ?? '?'}). See /artifacts/kind-debug.`,
+            );
+          }
+
+          cy.log(
+            `Kind: API ${plrName} still in progress (${cond?.status ?? '?'}/${cond?.reason ?? '?'}); ` +
+              `attempt ${attempt + 1}/${maxAttempts}`,
+          );
+          cy.wait(interval);
+          checkApi(attempt + 1);
+        });
+      };
+
+      checkApi(0);
+    });
   }
 
   static clickOnNode(nodeId: string) {

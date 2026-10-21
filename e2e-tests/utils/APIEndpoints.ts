@@ -14,6 +14,11 @@ export const hacAPIEndpoints = {
       'HAC_NAMESPACE',
     )}/pipelineruns?labelSelector=appstudio.openshift.io/application=${applicationName},${label}&limit=250`,
 
+  pipelinerun: (pipelineRunName: string) =>
+    `/api/k8s/apis/tekton.dev/v1beta1/namespaces/${Cypress.expose(
+      'HAC_NAMESPACE',
+    )}/pipelineruns/${pipelineRunName}`,
+
   secrets: (secretName: string) =>
     `/api/k8s/api/v1/namespaces/${Cypress.expose('HAC_NAMESPACE')}/secrets/${secretName}`,
 
