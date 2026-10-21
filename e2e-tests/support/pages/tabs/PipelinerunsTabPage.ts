@@ -137,10 +137,29 @@ export class DetailsTab {
           }
           if (attempt >= maxAttempts) {
             if (isLocalCluster) {
-              assert.fail(
+              const failMsg =
                 `Pipelinerun still "${statusText.trim()}" after ${timeoutDuration}ms on local kind; ` +
-                  'skipping page reload (reload drops the UI under build load).',
-              );
+                'skipping page reload (reload drops the UI under build load). ' +
+                'Check Cypress screenshots and /artifacts/kind-debug for which TaskRun hung.';
+              // Capture which TaskRuns are still Running before kind is torn down
+              // (kubectl dump also lands in /artifacts/kind-debug from the Task).
+              cy.screenshot('plr-still-running-details');
+              cy.get('body').then(($body) => {
+                if ($body.find(pipelinerunsTabPO.clickTaskRunsTab).length > 0) {
+                  TaskRunsTab.goToTaskrunsTab();
+                  cy.get('table, [data-test="taskrun-status"]', { timeout: 15000 })
+                    .first()
+                    .invoke('text')
+                    .then((taskText) => {
+                      cy.log(`TaskRuns at timeout:\n${taskText}`);
+                    });
+                  cy.screenshot('plr-still-running-taskruns');
+                }
+              });
+              cy.then(() => {
+                assert.fail(failMsg);
+              });
+              return;
             }
             cy.log(
               `Status is "${statusText}". Reloading page (${retries - 1} ${retries - 1 === 1 ? 'retry' : 'retries'} remaining).`,
