@@ -112,12 +112,6 @@ export class DetailsTab {
   // retries, since the UI may not update without a refresh. Uses recursion
   // instead of a loop because Cypress commands are asynchronous and don't
   // support try/catch for flow control.
-  //
-  // On LOCAL_CLUSTER (kind), the status badge often stays "Running" after the
-  // PipelineRun has already Succeeded (stale k8s watch under build load). Do
-  // not cy.reload() mid-build (drops :9443) and do not use requestHACAPI
-  // (Dex login has no oidc.user access_token). Soft-remount via list → details
-  // every few minutes so hooks re-GET status.
   static waitUntilStatusIsNotRunning(
     timeoutDuration: number = 1800000, // 30 minutes
     interval: number = 60000, // 60 seconds
@@ -125,11 +119,6 @@ export class DetailsTab {
   ) {
     if (retries < 0) {
       assert.fail('Pipelinerun is still running after maximum retries');
-    }
-
-    if (Cypress.expose('LOCAL_CLUSTER')) {
-      DetailsTab.waitUntilFinishedOnLocalCluster(timeoutDuration, interval);
-      return;
     }
 
     const maxAttempts = Math.max(1, Math.floor(timeoutDuration / interval));
@@ -156,65 +145,6 @@ export class DetailsTab {
     };
 
     checkStatus(0);
-  }
-
-  /**
-   * Kind-only: poll the status badge; after ~15m (builds usually done by then),
-   * periodically SPA-remount via Activity → Pipeline runs → PLR so hooks re-GET.
-   * Activity sub-tabs are not mounted on the details page, so we must open
-   * Activity first. Avoids requestHACAPI (no Dex OIDC token) and cy.reload().
-   */
-  private static waitUntilFinishedOnLocalCluster(timeoutDuration: number, interval: number) {
-    const maxAttempts = Math.max(1, Math.floor(timeoutDuration / interval));
-    const remountEvery = Math.max(1, Math.floor(300000 / interval)); // ~5 min
-    const remountAfter = Math.max(1, Math.floor(900000 / interval)); // ~15 min
-
-    cy.url().then((detailsUrl) => {
-      const plrName = detailsUrl.split('/pipelineruns/')[1]?.split(/[/?#]/)[0];
-      expect(plrName, 'pipeline run name from URL').to.be.a('string').and.not.be.empty;
-
-      const checkStatus = (attempt: number) => {
-        cy.get(pipelinerunsTabPO.statusPO)
-          .scrollIntoView()
-          .invoke('text')
-          .then((statusText) => {
-            if (!statusText.includes('Pending') && !statusText.includes('Running')) {
-              return;
-            }
-
-            if (attempt >= maxAttempts) {
-              cy.screenshot('plr-still-running-details');
-              assert.fail(
-                `Pipelinerun ${plrName} still "${statusText.trim()}" after ${timeoutDuration}ms on local kind. ` +
-                  'See /artifacts/kind-debug.',
-              );
-            }
-
-            cy.wait(interval);
-            const nextAttempt = attempt + 1;
-            if (nextAttempt >= remountAfter && nextAttempt % remountEvery === 0) {
-              cy.log(
-                `Kind: soft-remounting ${plrName} details (attempt ${nextAttempt}/${maxAttempts}) ` +
-                  'to refresh stale status watch',
-              );
-              // Details view does not mount activity__tabItem *; open Activity first.
-              cy.get(activityTabPO.clickTab, { timeout: 30000 }).click();
-              Common.waitForLoad();
-              cy.get(pipelinerunsTabPO.clickTab, { timeout: 30000 }).click();
-              Common.waitForLoad();
-              UIhelper.clickRowCellInTable(
-                'Pipeline run List',
-                plrName as string,
-                plrName as string,
-              );
-              cy.get(pipelinerunsTabPO.statusPO, { timeout: 60000 }).should('be.visible');
-            }
-            checkStatus(nextAttempt);
-          });
-      };
-
-      checkStatus(0);
-    });
   }
 
   static clickOnNode(nodeId: string) {
@@ -278,11 +208,6 @@ export class DetailsTab {
     allTaskLogs = true,
     expectedStatus = 'Succeeded',
   ) {
-    // Kind builds are slower and we cannot reload; allow a longer single poll window.
-    const effectiveTimeout = Cypress.expose('LOCAL_CLUSTER')
-      ? Math.max(timeoutDuration, 2700000) // 45 minutes
-      : timeoutDuration;
-    DetailsTab.waitUntilStatusIsNotRunning(effectiveTimeout);
     LogsTab.downloadAllTaskLogs(allTaskLogs);
     UIhelper.verifyLabelAndValue('Status', expectedStatus);
   }
