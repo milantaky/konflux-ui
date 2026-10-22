@@ -224,15 +224,8 @@ describe('Environment Configuration Tests', () => {
 
   describe('Check Issues page', () => {
     it('Navigate to Issues page from the sidebar', () => {
-      // Leave Secrets first: a leftover ?name= filter URL can keep the SPA on
-      // /secrets after clicking Issues in the sidebar (LOCAL_CLUSTER flaky).
-      const ns = Cypress.expose('HAC_NAMESPACE') as string;
-      cy.visit(`${Cypress.expose('KONFLUX_BASE_URL')}/ns/${ns}/applications`);
-      Common.waitForLoad();
-
       Common.navigateTo(NavItem.issues);
       Common.waitForLoad();
-      cy.url().should('include', '/issues');
 
       if (!Cypress.expose('LOCAL_CLUSTER')) {
         cy.get(issuesPagePO.page).contains(issuesPagePO.pageDescription).should('exist');

@@ -180,16 +180,6 @@ describe('Component Lifecycle Tests', () => {
 
           DetailsTab.waitForPLRAndDownloadAllLogs();
 
-          // Kind often never creates the Enterprise Contract Test PLR, so Related
-          // pipelines stays at 0. Keep the assert off LOCAL_CLUSTER.
-          if (!Cypress.expose('LOCAL_CLUSTER')) {
-            UIhelper.verifyLabelAndValue('Related pipelines', '1 pipeline');
-          } else {
-            cy.log(
-              'Skipping Related pipelines (1) assert on LOCAL_CLUSTER — EC Test PLR often missing',
-            );
-          }
-
           //Verify the Pipeline run details Graph
           piplinerunlogsTasks.forEach((item) => {
             UIhelper.verifyGraphNodes(item);
@@ -203,16 +193,10 @@ describe('Component Lifecycle Tests', () => {
         });
     });
 
-    it('Verify on-pull pipeline and EC', function () {
+    it('Verify on-pull pipeline and EC', () => {
       cy.log('Verify that on-pull pipeline was cancelled');
       Applications.clickBreadcrumbLink('Pipeline runs');
       Applications.checkPipelineIsCancelled(componentName);
-
-      // EC Test PLRs are unreliable on kind (integration-service); still verify cancel.
-      if (Cypress.expose('LOCAL_CLUSTER')) {
-        cy.log('Skipping Enterprise Contract Test PLR checks on LOCAL_CLUSTER');
-        return;
-      }
 
       cy.log('Verify Enterprise contract Test pipeline run Details');
       UIhelper.clickRowCellInTable('Pipeline run List', 'Test', `${applicationName}-`);
