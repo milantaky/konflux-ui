@@ -113,9 +113,10 @@ export class DetailsTab {
   // support try/catch for flow control.
   //
   // On LOCAL_CLUSTER (kind), the status badge often stays "Running" after the
-  // PipelineRun has already Succeeded (stale k8s watch under build load). Poll
-  // the HAC/k8s API instead; once terminal, remount details (visit is safe
-  // after builds finish — unlike reload mid-build, which drops :9443).
+  // PipelineRun has already Succeeded (stale k8s watch under build load). Do
+  // not cy.reload() mid-build (drops :9443) and do not use requestHACAPI
+  // (Dex login has no oidc.user access_token). Soft-remount via list → details
+  // every few minutes so hooks re-GET status.
   static waitUntilStatusIsNotRunning(
     timeoutDuration: number = 1800000, // 30 minutes
     interval: number = 60000, // 60 seconds
@@ -156,60 +157,57 @@ export class DetailsTab {
     checkStatus(0);
   }
 
-  /** Kind-only: wait on API Succeeded condition, then remount the details view. */
+  /**
+   * Kind-only: poll the status badge; periodically SPA-remount details
+   * (Pipeline runs list → click PLR) to refresh a stale watch. Avoids
+   * requestHACAPI (no Dex OIDC token) and cy.reload() mid-build.
+   */
   private static waitUntilFinishedOnLocalCluster(timeoutDuration: number, interval: number) {
     const maxAttempts = Math.max(1, Math.floor(timeoutDuration / interval));
+    // Soft-remount about every 5 minutes.
+    const remountEvery = Math.max(1, Math.floor(300000 / interval));
 
     cy.url().then((detailsUrl) => {
       const plrName = detailsUrl.split('/pipelineruns/')[1]?.split(/[/?#]/)[0];
       expect(plrName, 'pipeline run name from URL').to.be.a('string').and.not.be.empty;
 
-      const checkApi = (attempt: number) => {
-        APIHelper.requestHACAPI({
-          url: hacAPIEndpoints.pipelinerun(plrName as string),
-          failOnStatusCode: false,
-          timeout: 30000,
-        }).then((resp) => {
-          const cond = (
-            (resp.body?.status?.conditions as
-              { type?: string; status?: string; reason?: string }[] | undefined) || []
-          ).find((c) => c.type === 'Succeeded');
-          // Tekton: status Unknown (+ reason Running) while in progress; True/False when done.
-          const isTerminal = Boolean(cond && cond.status && cond.status !== 'Unknown');
+      const checkStatus = (attempt: number) => {
+        cy.get(pipelinerunsTabPO.statusPO)
+          .scrollIntoView()
+          .invoke('text')
+          .then((statusText) => {
+            if (!statusText.includes('Pending') && !statusText.includes('Running')) {
+              return;
+            }
 
-          if (isTerminal) {
-            cy.log(
-              `Kind: API ${plrName} finished (${cond?.status}/${cond?.reason}); remounting details view.`,
-            );
-            cy.visit(detailsUrl, { failOnStatusCode: false });
-            cy.get(pipelinerunsTabPO.statusPO, { timeout: 120000 })
-              .should('be.visible')
-              .invoke('text')
-              .should((text) => {
-                expect(text, 'status after remount').to.not.include('Pending');
-                expect(text, 'status after remount').to.not.include('Running');
-              });
-            return;
-          }
+            if (attempt >= maxAttempts) {
+              cy.screenshot('plr-still-running-details');
+              assert.fail(
+                `Pipelinerun ${plrName} still "${statusText.trim()}" after ${timeoutDuration}ms on local kind. ` +
+                  'See /artifacts/kind-debug.',
+              );
+            }
 
-          if (attempt >= maxAttempts) {
-            cy.screenshot('plr-still-running-details');
-            assert.fail(
-              `Pipelinerun ${plrName} still in progress in API after ${timeoutDuration}ms on local kind ` +
-                `(${cond?.status ?? '?'}/${cond?.reason ?? '?'}). See /artifacts/kind-debug.`,
-            );
-          }
-
-          cy.log(
-            `Kind: API ${plrName} still in progress (${cond?.status ?? '?'}/${cond?.reason ?? '?'}); ` +
-              `attempt ${attempt + 1}/${maxAttempts}`,
-          );
-          cy.wait(interval);
-          checkApi(attempt + 1);
-        });
+            cy.wait(interval);
+            const nextAttempt = attempt + 1;
+            if (nextAttempt % remountEvery === 0) {
+              cy.log(
+                `Kind: soft-remounting ${plrName} details (attempt ${nextAttempt}/${maxAttempts}) ` +
+                  'to refresh stale status watch',
+              );
+              cy.get(pipelinerunsTabPO.clickTab, { timeout: 30000 }).click();
+              UIhelper.clickRowCellInTable(
+                'Pipeline run List',
+                plrName as string,
+                plrName as string,
+              );
+              cy.get(pipelinerunsTabPO.statusPO, { timeout: 60000 }).should('be.visible');
+            }
+            checkStatus(nextAttempt);
+          });
       };
 
-      checkApi(0);
+      checkStatus(0);
     });
   }
 
