@@ -1,8 +1,9 @@
 import { hacAPIEndpoints } from '../../../utils/APIEndpoints';
 import { APIHelper } from '../../../utils/APIHelper';
+import { Common } from '../../../utils/Common';
 import { LogViewerHelper } from '../../../utils/LogViewerHelper';
 import { UIhelper } from '../../../utils/UIhelper';
-import { pipelinerunsTabPO } from '../../pageObjects/pages-po';
+import { activityTabPO, pipelinerunsTabPO } from '../../pageObjects/pages-po';
 
 type taskRunDetailsRow = {
   name: string | RegExp;
@@ -158,14 +159,15 @@ export class DetailsTab {
   }
 
   /**
-   * Kind-only: poll the status badge; periodically SPA-remount details
-   * (Pipeline runs list → click PLR) to refresh a stale watch. Avoids
-   * requestHACAPI (no Dex OIDC token) and cy.reload() mid-build.
+   * Kind-only: poll the status badge; after ~15m (builds usually done by then),
+   * periodically SPA-remount via Activity → Pipeline runs → PLR so hooks re-GET.
+   * Activity sub-tabs are not mounted on the details page, so we must open
+   * Activity first. Avoids requestHACAPI (no Dex OIDC token) and cy.reload().
    */
   private static waitUntilFinishedOnLocalCluster(timeoutDuration: number, interval: number) {
     const maxAttempts = Math.max(1, Math.floor(timeoutDuration / interval));
-    // Soft-remount about every 5 minutes.
-    const remountEvery = Math.max(1, Math.floor(300000 / interval));
+    const remountEvery = Math.max(1, Math.floor(300000 / interval)); // ~5 min
+    const remountAfter = Math.max(1, Math.floor(900000 / interval)); // ~15 min
 
     cy.url().then((detailsUrl) => {
       const plrName = detailsUrl.split('/pipelineruns/')[1]?.split(/[/?#]/)[0];
@@ -190,12 +192,16 @@ export class DetailsTab {
 
             cy.wait(interval);
             const nextAttempt = attempt + 1;
-            if (nextAttempt % remountEvery === 0) {
+            if (nextAttempt >= remountAfter && nextAttempt % remountEvery === 0) {
               cy.log(
                 `Kind: soft-remounting ${plrName} details (attempt ${nextAttempt}/${maxAttempts}) ` +
                   'to refresh stale status watch',
               );
+              // Details view does not mount activity__tabItem *; open Activity first.
+              cy.get(activityTabPO.clickTab, { timeout: 30000 }).click();
+              Common.waitForLoad();
               cy.get(pipelinerunsTabPO.clickTab, { timeout: 30000 }).click();
+              Common.waitForLoad();
               UIhelper.clickRowCellInTable(
                 'Pipeline run List',
                 plrName as string,
