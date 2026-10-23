@@ -204,7 +204,7 @@ export class DetailsTab {
   }
 
   static waitForPLRAndDownloadAllLogs(
-    timeoutDuration: number = 2400000, // 40 minutes
+    timeoutDuration: number = 1800000, // 40 minutes
     allTaskLogs = true,
     expectedStatus = 'Succeeded',
   ) {

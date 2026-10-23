@@ -561,6 +561,7 @@ spec:
           CODECOV_TOKEN="$(cat /codecov-credentials/token)"
           export CODECOV_TOKEN
         fi
+
         if [ -z "${CODECOV_TOKEN:-}" ]; then
           echo "CODECOV_TOKEN not available — skipping Codecov upload"
           exit 0

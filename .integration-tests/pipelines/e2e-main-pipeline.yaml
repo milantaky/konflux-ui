@@ -230,10 +230,7 @@ spec:
           value: $(tasks.test-metadata.results.container-image)
 
     # deploy-konflux-ci cannot reliably override the UI image (ui folder vs
-    # konflux-ui image name, digest pins). Patch proxy to the instrumented
-    # (coverage) or SNAPSHOT image from format-instrumented-ui-image.
-    # Also fixes smee→PaC downstream (deploy points at node-ip:8180; PaC is
-    # NodePort so that hangs — use in-cluster Service DNS instead).
+    # konflux-ui image name, digest pins). Patch proxy to the instrumented image
     - name: patch-konflux-ui-image
       runAfter:
         - deploy-konflux
@@ -259,11 +256,9 @@ spec:
         - name: pull-secret
           value: $(params.ui-image-pull-secret)
 
-    # Run alongside e2e (not right after deploy) so smee/PaC logs cover
-    # component create + on-pull webhook delivery — the failure mode we care about.
     - name: monitor-webhook-logs
       runAfter:
-        - format-e2e-test-image
+        - deploy-konflux
       when:
         - input: '$(params.job-type)'
           operator: notin
