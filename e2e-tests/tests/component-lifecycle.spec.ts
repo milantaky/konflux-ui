@@ -180,6 +180,8 @@ describe('Component Lifecycle Tests', () => {
 
           DetailsTab.waitForPLRAndDownloadAllLogs();
 
+          UIhelper.verifyLabelAndValue('Related pipelines', '1 pipeline');
+
           //Verify the Pipeline run details Graph
           piplinerunlogsTasks.forEach((item) => {
             UIhelper.verifyGraphNodes(item);

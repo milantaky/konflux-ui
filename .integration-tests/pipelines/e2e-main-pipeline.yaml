@@ -279,7 +279,7 @@ spec:
             value: .integration-tests/tasks/monitor-webhook-logs.yaml
       params:
         - name: monitoring-duration
-          value: '15m'
+          value: '5m'
 
     - name: format-e2e-test-image
       runAfter:

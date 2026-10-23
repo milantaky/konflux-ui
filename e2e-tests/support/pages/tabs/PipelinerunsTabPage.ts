@@ -1,9 +1,8 @@
 import { hacAPIEndpoints } from '../../../utils/APIEndpoints';
 import { APIHelper } from '../../../utils/APIHelper';
-import { Common } from '../../../utils/Common';
 import { LogViewerHelper } from '../../../utils/LogViewerHelper';
 import { UIhelper } from '../../../utils/UIhelper';
-import { activityTabPO, pipelinerunsTabPO } from '../../pageObjects/pages-po';
+import { pipelinerunsTabPO } from '../../pageObjects/pages-po';
 
 type taskRunDetailsRow = {
   name: string | RegExp;
@@ -136,6 +135,7 @@ export class DetailsTab {
               `Status is "${statusText}". Reloading page (${retries - 1} ${retries - 1 === 1 ? 'retry' : 'retries'} remaining).`,
             );
             cy.reload();
+            // 180000 ms = 3 minutes
             this.waitUntilStatusIsNotRunning(timeoutDuration, interval, retries - 1);
             return;
           }
@@ -204,10 +204,11 @@ export class DetailsTab {
   }
 
   static waitForPLRAndDownloadAllLogs(
-    timeoutDuration: number = 1800000, // 30 minutes
+    timeoutDuration: number = 2400000, // 40 minutes
     allTaskLogs = true,
     expectedStatus = 'Succeeded',
   ) {
+    DetailsTab.waitUntilStatusIsNotRunning(timeoutDuration);
     LogsTab.downloadAllTaskLogs(allTaskLogs);
     UIhelper.verifyLabelAndValue('Status', expectedStatus);
   }
