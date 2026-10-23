@@ -289,6 +289,7 @@ spec:
         echo "=== Selecting E2E test sources ==="
         SPEC_FILE="$(params.spec-file)"
 
+        # prepare-e2e-sources stages PR e2e-tests/ at /e2e when the folder changed; otherwise /e2e stays empty.
         if [ -n "$(ls -A /e2e 2>/dev/null)" ]; then
           echo "PR e2e sources detected at /e2e — installing dependencies"
           cd /e2e
@@ -431,6 +432,7 @@ spec:
         STARTED_EPOCH=$(date +%s)
         STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
+        # KEEP
         ENABLE_COVERAGE="$(params.enable-coverage)"
         if [ "$(params.job-type)" = "periodic-stage" ]; then
           ENABLE_COVERAGE="false"
@@ -445,6 +447,8 @@ spec:
           yarn run cy:run --spec "${SPEC_FILE}"
         fi
         TEST_RESULT=$?
+
+        # KEEP END
 
         ENDED_EPOCH=$(date +%s)
         ENDED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)

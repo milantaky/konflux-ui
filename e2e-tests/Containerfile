@@ -1,4 +1,3 @@
-# Google only keeps the latest stable .deb in the apt pool; older pins 404.
 ARG CHROME_VERSION='155.0.8059.84-1'
 
 FROM cypress/factory:7.2.2
