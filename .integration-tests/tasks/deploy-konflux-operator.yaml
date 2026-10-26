@@ -9,45 +9,34 @@ metadata:
     tekton.dev/pipelines.minVersion: '0.44.x'
 spec:
   description: >-
-    Deploys Konflux onto an existing Kind cluster using the Konflux Operator
-    (deps → operator install.yaml → Konflux CR → PaC/Quay/smee secrets →
-    optional demo resources). Replaces the legacy deploy-konflux-ci
-    (deploy-konflux.sh) path for PR-check and periodic-local jobs.
+    Deploys Konflux onto an already-provisioned Kind cluster by wrapping
+    konflux-ci's scripts/deploy-local.sh (same path as the GitHub
+    konflux-ui-deploy-test action). Maps build-credentials into the env
+    vars that script expects, skips Kind creation, then pushes logs to OCI.
   params:
     - name: cluster-access-secret
       type: string
       description: Secret with kubeconfig for the Kind cluster (kfg-<pipelinerun>).
     - name: repo-url
       type: string
-      description: Git repository with deploy-deps.sh and sample Konflux CRs.
+      description: konflux-ci Git repository (provides deploy-local.sh).
       default: https://github.com/konflux-ci/konflux-ci.git
     - name: repo-revision
       type: string
-      description: Git revision to clone for dependency scripts and sample CRs.
+      description: Git revision to clone for deploy scripts.
       default: main
     - name: operator-release
       type: string
       description: >-
-        Konflux Operator release tag for install.yaml (e.g. v0.1.13), or
-        "latest". Pin after the first green run for reproducibility.
+        Release tag for install.yaml / samples (e.g. v0.1.13), or "latest".
+        Pin after the first green run.
       default: latest
-    - name: konflux-cr
-      type: string
-      description: >-
-        Path to the Konflux CR within the cloned repo. konflux-e2e.yaml enables
-        image-controller and default-tenant for E2E.
-      default: operator/config/samples/konflux-e2e.yaml
-    - name: create-test-resources
-      type: string
-      description: When true, run deploy-test-resources.sh (demo tenants/apps).
-      default: 'true'
     - name: oci-ref
       type: string
       description: Full OCI artifact reference used to store deploy logs.
     - name: oci-credentials
       type: string
-      description: >-
-        Secret with oci-storage-dockerconfigjson for pushing deploy logs.
+      description: Secret with oci-storage-dockerconfigjson for pushing deploy logs.
     - name: build-credentials
       type: string
       description: >-
@@ -94,156 +83,40 @@ spec:
         - -revision=$(params.repo-revision)
         - -path=.
 
-    - name: deploy-operator
+    - name: deploy-local
       image: quay.io/konflux-ci/tekton-integration-catalog/utils@sha256:79707a56aa34a59f8ebb97db855114b840cbbf60bece4a0edf8ef8c7d7d5acd1
       onError: continue
       workingDir: /var/workdir
       env:
         - name: OPERATOR_RELEASE
           value: $(params.operator-release)
-        - name: KONFLUX_CR
-          value: $(params.konflux-cr)
       script: |
         #!/usr/bin/env bash
         set -euo pipefail
 
         {
-          echo "=== Operator-based Konflux deploy ==="
+          echo "=== Deploy Konflux via scripts/deploy-local.sh ==="
           kubectl cluster-info
 
-          # Configure smee channel before deploy-deps (it applies dependencies/smee).
-          if [[ -f /build-credentials/smee-channel ]]; then
-            SMEE_CHANNEL=$(< /build-credentials/smee-channel)
-            echo "[INFO] Configuring Smee channel: ${SMEE_CHANNEL}"
-            sed "s|https://smee.io/CHANNELID|${SMEE_CHANNEL}|g" \
-              ./dependencies/smee/smee-channel-id.tpl \
-              > ./dependencies/smee/smee-channel-id.yaml
-          else
-            echo "[WARNING] No smee-channel in build-credentials; deploy-deps will randomize one"
-          fi
+          # Map IT build-credentials secret keys → deploy-local.sh / deploy-secrets.sh env.
+          export GITHUB_APP_ID=$(< /build-credentials/gh-app-id)
+          export GITHUB_PRIVATE_KEY=$(< /build-credentials/gh-app-private-key)
+          export WEBHOOK_SECRET=$(< /build-credentials/gh-app-webhook-secret)
+          export QUAY_TOKEN=$(< /build-credentials/quay-org-token)
+          export QUAY_ORGANIZATION=$(< /build-credentials/quay-org-name)
+          export SMEE_CHANNEL=$(< /build-credentials/smee-channel)
 
-          # Skip pieces the operator owns (same idea as scripts/deploy-local.sh).
-          echo "[INFO] Installing cluster dependencies (Tekton, cert-manager, PaC, Kyverno, smee...)"
-          SKIP_DEX=true \
-          SKIP_KONFLUX_INFO=true \
-          SKIP_CLUSTER_ISSUER=true \
-          SKIP_INTERNAL_REGISTRY=true \
-          ./deploy-deps.sh
+          # Kind already provisioned by the pipeline (mapt). Same operator path as
+          # .github/actions/konflux-ui-deploy-test. Quay env auto-selects konflux-e2e.yaml.
+          export DEPLOY_LOCAL_SKIP_KIND=1
+          export OPERATOR_INSTALL_METHOD=release
+          export OPERATOR_RELEASE
+          export SET_SKIP_CHECKS=true
 
-          if [[ "${OPERATOR_RELEASE}" == "latest" ]]; then
-            INSTALL_URL="https://github.com/konflux-ci/konflux-ci/releases/latest/download/install.yaml"
-          else
-            INSTALL_URL="https://github.com/konflux-ci/konflux-ci/releases/download/${OPERATOR_RELEASE}/install.yaml"
-          fi
+          ./scripts/deploy-local.sh
 
-          echo "[INFO] Installing Konflux Operator from ${INSTALL_URL}"
-          kubectl apply -f "${INSTALL_URL}"
-
-          echo "[INFO] Waiting for operator to become Available..."
-          kubectl wait --for=condition=Available \
-            deployment/konflux-operator-controller-manager \
-            -n konflux-operator \
-            --timeout=5m
-
-          if [[ ! -f "${KONFLUX_CR}" ]]; then
-            echo "ERROR: Konflux CR not found at ${KONFLUX_CR}"
-            exit 1
-          fi
-
-          echo "[INFO] Applying Konflux CR: ${KONFLUX_CR}"
-          kubectl apply -f "${KONFLUX_CR}"
-
+          kubectl get konflux konflux || true
           kubectl get po -A || true
-        } 2>&1 | tee -a "${LOG_FILENAME}"
-
-    - name: create-secrets
-      image: quay.io/konflux-ci/tekton-integration-catalog/utils@sha256:79707a56aa34a59f8ebb97db855114b840cbbf60bece4a0edf8ef8c7d7d5acd1
-      onError: continue
-      workingDir: /var/workdir
-      script: |
-        #!/usr/bin/env bash
-        set -euo pipefail
-
-        wait_for_namespace() {
-          local ns="$1"
-          local timeout="${2:-300}"
-          local elapsed=0
-          echo "[INFO] Waiting for namespace ${ns}..."
-          while (( elapsed < timeout )); do
-            if kubectl get namespace "${ns}" &>/dev/null; then
-              echo "[INFO] Namespace ${ns} exists"
-              return 0
-            fi
-            sleep 5
-            elapsed=$((elapsed + 5))
-          done
-          echo "ERROR: Namespace ${ns} not created within ${timeout}s"
-          return 1
-        }
-
-        {
-          echo "=== Creating build / PaC / image-controller secrets ==="
-
-          QUAY_ORG_NAME=$(< /build-credentials/quay-org-name)
-          QUAY_ORG_TOKEN=$(< /build-credentials/quay-org-token)
-          GH_APP_PRIVATE_KEY=$(< /build-credentials/gh-app-private-key)
-          GH_APP_ID=$(< /build-credentials/gh-app-id)
-          GH_APP_WEBHOOK_SECRET=$(< /build-credentials/gh-app-webhook-secret)
-
-          pac_namespaces=( pipelines-as-code build-service integration-service )
-          for ns in "${pac_namespaces[@]}"; do
-            wait_for_namespace "${ns}"
-            echo "[INFO] Creating pipelines-as-code-secret in ${ns}"
-            kubectl -n "${ns}" create secret generic pipelines-as-code-secret \
-              --from-literal=github-private-key="${GH_APP_PRIVATE_KEY}" \
-              --from-literal=github-application-id="${GH_APP_ID}" \
-              --from-literal=webhook.secret="${GH_APP_WEBHOOK_SECRET}" \
-              --dry-run=client -o yaml | kubectl apply -f -
-          done
-
-          # konflux-e2e.yaml enables image-controller; secret format matches deploy-local.sh.
-          wait_for_namespace image-controller
-          echo "[INFO] Creating quaytoken secret in image-controller"
-          kubectl -n image-controller create secret generic quaytoken \
-            --from-literal=quaytoken="${QUAY_ORG_TOKEN}" \
-            --from-literal=organization="${QUAY_ORG_NAME}" \
-            --dry-run=client -o yaml | kubectl apply -f -
-
-          echo "[INFO] Waiting for image-controller pods..."
-          if kubectl wait --for=condition=Ready --timeout=240s \
-            -l control-plane=controller-manager -n image-controller pod 2>/dev/null; then
-            echo "[INFO] image-controller is ready"
-          else
-            echo "[WARNING] image-controller pods not Ready within 4m (may cause e2e flakes)"
-          fi
-
-          echo "[INFO] Waiting for Konflux CR Ready (up to 15m)..."
-          if kubectl wait --for=condition=Ready=True konflux/konflux --timeout=15m; then
-            echo "[INFO] Konflux is Ready"
-            kubectl get konflux konflux
-          else
-            echo "[ERROR] Konflux CR did not become Ready within 15m"
-            kubectl get konflux konflux -o yaml || true
-            kubectl get pods -A || true
-            exit 1
-          fi
-        } 2>&1 | tee -a "${LOG_FILENAME}"
-
-    - name: create-test-resources
-      image: quay.io/konflux-ci/tekton-integration-catalog/utils@sha256:79707a56aa34a59f8ebb97db855114b840cbbf60bece4a0edf8ef8c7d7d5acd1
-      onError: continue
-      workingDir: /var/workdir
-      when:
-        - input: $(params.create-test-resources)
-          operator: in
-          values: ['true']
-      script: |
-        #!/usr/bin/env bash
-        set -euo pipefail
-
-        {
-          echo "[INFO] Creating demo test resources (user-ns1/user-ns2 + sample apps)..."
-          ./deploy-test-resources.sh
         } 2>&1 | tee -a "${LOG_FILENAME}"
 
     - name: secure-push-oci
