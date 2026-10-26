@@ -123,6 +123,9 @@ spec:
         - name: memory
           value: '16'
 
+    # Operator-based install (KFLUXUI-1783). Replaces legacy deploy-konflux-ci
+    # (legacy branch + deploy-konflux.sh). UI SNAPSHOT override stays in
+    # patch-konflux-ui-image for now.
     - name: deploy-konflux
       runAfter:
         - provision-kind-cluster
@@ -134,22 +137,14 @@ spec:
         resolver: git
         params:
           - name: url
-            value: https://github.com/konflux-ci/tekton-integration-catalog
+            value: https://github.com/milantaky/konflux-ui
           - name: revision
-            value: main
+            value: feat/operator-deploy
           - name: pathInRepo
-            value: tasks/konflux-ci/deploy/0.3/deploy-konflux-ci.yaml
+            value: .integration-tests/tasks/deploy-konflux-operator.yaml
       params:
         - name: cluster-access-secret
           value: kfg-$(context.pipelineRun.name)
-        - name: component-name
-          value: ui
-        - name: component-pr-owner
-          value: $(tasks.test-metadata.results.pull-request-author)
-        - name: component-pr-sha
-          value: $(tasks.test-metadata.results.git-revision)
-        - name: component-pr-source-branch
-          value: $(tasks.test-metadata.results.source-repo-branch)
         - name: oci-ref
           value: $(params.oci-container-repo):$(context.pipelineRun.name)
         - name: oci-credentials
@@ -157,8 +152,8 @@ spec:
         - name: build-credentials
           value: $(params.build-credentials-secret)
 
-    # deploy-konflux-ci cannot reliably override the UI image (ui folder vs
-    # konflux-ui image name, digest pins). Patch proxy to the SNAPSHOT image.
+    # Operator has no UI image field yet; patch proxy to the SNAPSHOT image
+    # (scales operator down so it does not reconcile the stock image back).
     - name: patch-konflux-ui-image
       runAfter:
         - deploy-konflux
