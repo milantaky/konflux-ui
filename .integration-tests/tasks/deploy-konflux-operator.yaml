@@ -117,20 +117,30 @@ spec:
 
           # Cypress reaches the UI via Kind node IP:9443 (run-e2e retrieve-local-url).
           # Release samples configure oauth2-proxy/Dex for localhost:9443 (local Kind / GHA).
-          # Point ingress.host at the node IP so OIDC redirects match the URL Cypress uses
+          # Point ingress.fqdn at the node IP so OIDC redirects match the URL Cypress uses
           # (legacy deploy-konflux-ci did the equivalent with sed on dex/proxy manifests).
+          # NOTE: released operator CRD field is ingress.fqdn (not the older ingress.host).
           KUBE_SERVER=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
           KIND_IP=$(sed -E 's|https?://([^:/]+).*|\1|' <<< "${KUBE_SERVER}")
           UI_HOST="${KIND_IP}:9443"
-          echo "[INFO] Patching Konflux UI ingress.host to ${UI_HOST}"
+          echo "[INFO] Patching Konflux UI ingress.fqdn to ${UI_HOST}"
           kubectl patch konflux konflux --type=merge \
-            -p "{\"spec\":{\"ui\":{\"spec\":{\"ingress\":{\"host\":\"${UI_HOST}\"}}}}}"
+            -p "{\"spec\":{\"ui\":{\"spec\":{\"ingress\":{\"fqdn\":\"${UI_HOST}\"}}}}}"
 
-          echo "[INFO] Waiting for Konflux to reconcile after host patch..."
+          echo "[INFO] Waiting for Konflux to reconcile after fqdn patch..."
           kubectl wait --for=condition=Ready=True konflux/konflux --timeout=10m
           kubectl rollout status deployment/proxy -n konflux-ui --timeout=5m || true
 
-          kubectl get konflux konflux -o wide || true
+          GET_LINE=$(kubectl get konflux konflux -o wide --no-headers 2>/dev/null || true)
+          echo "[INFO] Konflux after fqdn patch: ${GET_LINE}"
+          if [[ "${GET_LINE}" == *localhost* ]] || [[ "${GET_LINE}" != *"${KIND_IP}"* ]]; then
+            echo "ERROR: UI URL did not switch to Kind IP ${KIND_IP} after ingress.fqdn=${UI_HOST}"
+            echo "       Got: ${GET_LINE}"
+            echo "       OIDC redirects will not match Cypress (chrome-error / missing login button)."
+            kubectl get konflux konflux -o yaml | head -120 || true
+            exit 1
+          fi
+
           kubectl get po -A || true
         } 2>&1 | tee -a "${LOG_FILENAME}"
 
