@@ -12,7 +12,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@apidevtools/json-schema-ref-parser@npm:^11.5.5":
+"@apidevtools/json-schema-ref-parser@npm:^11.9.3":
   version: 11.9.3
   resolution: "@apidevtools/json-schema-ref-parser@npm:11.9.3"
   dependencies:
@@ -6127,10 +6127,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/lodash@npm:^4.17.7":
-  version: 4.17.24
-  resolution: "@types/lodash@npm:4.17.24"
-  checksum: 10/0f2082565f60f9787eefc046edc38458054512be5a8b3584ef0bad5fd9e85d0ab55ec5a1fbfae1ed6ba015cf1f9e837d5fb4da1f99fc60b8f74b2a46146fb00f
+"@types/lodash@npm:^4.17.25":
+  version: 4.17.26
+  resolution: "@types/lodash@npm:4.17.26"
+  checksum: 10/49620ccc6e8c03e0f7589be3d21ead40409fb6a2c4808170e57f35cd4523d146ebf6ecbd97a266d767a71e98417fce215740690f4f131be060d1a534cac09b84
   languageName: node
   linkType: hard
 
@@ -7342,6 +7342,13 @@ __metadata:
   version: 2.0.1
   resolution: "argparse@npm:2.0.1"
   checksum: 10/18640244e641a417ec75a9bd38b0b2b6b95af5199aa241b131d4b2fb206f334d7ecc600bd194861610a5579084978bfcbb02baa399dbe442d56d0ae5e60dbaef
+  languageName: node
+  linkType: hard
+
+"argparse@npm:^3.0.3":
+  version: 3.0.3
+  resolution: "argparse@npm:3.0.3"
+  checksum: 10/6834e247fe8a8d21a0061dc2b7134ae79625d9ab795eca043d8ba9434be3bc1e7d049c9a4aa01bd3d6bfc145b29addfb290d17b8b3f7b11710cc52ab13629f31
   languageName: node
   linkType: hard
 
@@ -14266,6 +14273,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"js-yaml@npm:^5.2.3":
+  version: 5.5.0
+  resolution: "js-yaml@npm:5.5.0"
+  dependencies:
+    argparse: "npm:^3.0.3"
+  bin:
+    js-yaml: bin/js-yaml.mjs
+  checksum: 10/c01359a4fe69a1c032e9e57d7387a1cbdfbbd45bc69924885a3c9a9a020e066627dc125f7b46f7b929186b5a65471ae5fa478d3f773e35f7ccdf57d32fcf369f
+  languageName: node
+  linkType: hard
+
 "jsdom@npm:^20.0.0":
   version: 20.0.3
   resolution: "jsdom@npm:20.0.3"
@@ -14328,22 +14346,21 @@ __metadata:
   languageName: node
   linkType: hard
 
-"json-schema-to-typescript@npm:^15.0.4":
-  version: 15.0.4
-  resolution: "json-schema-to-typescript@npm:15.0.4"
+"json-schema-to-typescript@npm:^16.0.0":
+  version: 16.0.0
+  resolution: "json-schema-to-typescript@npm:16.0.0"
   dependencies:
-    "@apidevtools/json-schema-ref-parser": "npm:^11.5.5"
+    "@apidevtools/json-schema-ref-parser": "npm:^11.9.3"
     "@types/json-schema": "npm:^7.0.15"
-    "@types/lodash": "npm:^4.17.7"
-    is-glob: "npm:^4.0.3"
-    js-yaml: "npm:^4.1.0"
-    lodash: "npm:^4.17.21"
+    "@types/lodash": "npm:^4.17.25"
+    js-yaml: "npm:^5.2.3"
+    lodash: "npm:^4.18.1"
     minimist: "npm:^1.2.8"
-    prettier: "npm:^3.2.5"
-    tinyglobby: "npm:^0.2.9"
+    prettier: "npm:^3.9.6"
+    tinyglobby: "npm:^0.2.17"
   bin:
     json2ts: dist/src/cli.js
-  checksum: 10/99544c8b2e10f1487fd685357d8333e70f5eb9c1ba96fbdcc172d8cf62dc382158276ad82648a93911562f07da7c2adf7733d4608ffdeca9525d08d7930b9880
+  checksum: 10/9526c2a6a51c5d5cd5c5b4b1caeb08eaab630a32ed89d4b630a9170cc5e8b4307901e9b21fc66ff5be3d5d38cb9c1067db1d064b3a858ae59d99eb66c21888ae
   languageName: node
   linkType: hard
 
@@ -14551,7 +14568,7 @@ __metadata:
     jest-environment-jsdom: "npm:^29.7.0"
     jest-image-snapshot: "npm:6.5.2"
     js-base64: "npm:^3.7.7"
-    json-schema-to-typescript: "npm:^15.0.4"
+    json-schema-to-typescript: "npm:^16.0.0"
     lint-staged: "npm:^15.2.7"
     lodash-es: "npm:4.18.1"
     mini-css-extract-plugin: "npm:^2.9.0"
@@ -17031,6 +17048,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"picomatch@npm:^4.0.4":
+  version: 4.0.7
+  resolution: "picomatch@npm:4.0.7"
+  checksum: 10/66e1df34bc39c72fa3756be4069f7887ea3e35e94bba1c3f6167763007698cb04b8a0a365161d186fda6e9571a2d3efb606b2966eb6a7dea6252911224dc2f48
+  languageName: node
+  linkType: hard
+
 "pidtree@npm:^0.6.0":
   version: 0.6.0
   resolution: "pidtree@npm:0.6.0"
@@ -17641,12 +17665,12 @@ __metadata:
   languageName: node
   linkType: hard
 
-"prettier@npm:^3.2.5":
-  version: 3.8.1
-  resolution: "prettier@npm:3.8.1"
+"prettier@npm:^3.9.6":
+  version: 3.9.10
+  resolution: "prettier@npm:3.9.10"
   bin:
     prettier: bin/prettier.cjs
-  checksum: 10/3da1cf8c1ef9bea828aa618553696c312e951f810bee368f6887109b203f18ee869fe88f66e65f9cf60b7cb1f2eae859892c860a300c062ff8ec69c381fc8dbd
+  checksum: 10/5d0118add4b44eb9d50c114f5c525451cc92be9da300ad0552787472535a3f23884baed3223d9b577bb7d1152eb58aeccfcc2b4541c0cf2274c0b4d328e36834
   languageName: node
   linkType: hard
 
@@ -20203,13 +20227,23 @@ __metadata:
   languageName: node
   linkType: hard
 
-"tinyglobby@npm:^0.2.12, tinyglobby@npm:^0.2.13, tinyglobby@npm:^0.2.9":
+"tinyglobby@npm:^0.2.12, tinyglobby@npm:^0.2.13":
   version: 0.2.15
   resolution: "tinyglobby@npm:0.2.15"
   dependencies:
     fdir: "npm:^6.5.0"
     picomatch: "npm:^4.0.3"
   checksum: 10/d72bd826a8b0fa5fa3929e7fe5ba48fceb2ae495df3a231b6c5408cd7d8c00b58ab5a9c2a76ba56a62ee9b5e083626f1f33599734bed1ffc4b792406408f0ca2
+  languageName: node
+  linkType: hard
+
+"tinyglobby@npm:^0.2.17":
+  version: 0.2.17
+  resolution: "tinyglobby@npm:0.2.17"
+  dependencies:
+    fdir: "npm:^6.5.0"
+    picomatch: "npm:^4.0.4"
+  checksum: 10/f85e8a217d675c3f78d5f0ad25ea4557e7e023ed13ddc2b014da10bd0312eea53a34cd52356af07ccdff777f1243012547656282a4ca70936f68bf5065fbaa71
   languageName: node
   linkType: hard
 
