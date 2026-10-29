@@ -369,7 +369,7 @@ spec:
           volumes:
             - name: qe-quay-auth
               secret:
-                secretName: build-creds-image
+                secretName: quay-repo-key
           steps:
             - name: skopeo-copy
               image: registry.access.redhat.com/ubi9/skopeo@sha256:6ebbdfce633f9915a6a99d8ee035d9fd258121aa1acf944229e90696eb353549
@@ -388,13 +388,7 @@ spec:
                 #!/usr/bin/env bash
                 set -euo pipefail
 
-                # build-credentials-secret is Opaque (quay-username / quay-org-token),
-                # not kubernetes.io/dockerconfigjson — build an authfile for skopeo.
-                USER="$(cat /etc/qe-quay-auth/quay-username)"
-                TOKEN="$(cat /etc/qe-quay-auth/quay-org-token)"
-                AUTH="$(printf '%s:%s' "${USER}" "${TOKEN}" | base64 -w0 2>/dev/null || printf '%s:%s' "${USER}" "${TOKEN}" | base64)"
-                DEST_AUTH="/tmp/qe-quay-auth.json"
-                printf '{"auths":{"quay.io":{"auth":"%s"}}}\n' "${AUTH}" > "${DEST_AUTH}"
+                DEST_AUTH="/etc/qe-quay-auth/.dockerconfigjson"
 
                 # IMAGE_URL is always repo:tag; strip tag and pin by digest
                 # (containers/image rejects name:tag@digest).
