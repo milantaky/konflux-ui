@@ -388,7 +388,13 @@ spec:
                 #!/usr/bin/env bash
                 set -euo pipefail
 
-                DEST_AUTH="/etc/qe-quay-auth/.dockerconfigjson"
+                # build-credentials-secret is Opaque (quay-username / quay-org-token),
+                # not kubernetes.io/dockerconfigjson — build an authfile for skopeo.
+                USER="$(cat /etc/qe-quay-auth/quay-username)"
+                TOKEN="$(cat /etc/qe-quay-auth/quay-org-token)"
+                AUTH="$(printf '%s:%s' "${USER}" "${TOKEN}" | base64 -w0 2>/dev/null || printf '%s:%s' "${USER}" "${TOKEN}" | base64)"
+                DEST_AUTH="/tmp/qe-quay-auth.json"
+                printf '{"auths":{"quay.io":{"auth":"%s"}}}\n' "${AUTH}" > "${DEST_AUTH}"
 
                 # IMAGE_URL is always repo:tag; strip tag and pin by digest
                 # (containers/image rejects name:tag@digest).
