@@ -42,6 +42,13 @@ spec:
       description: >-
         Secret with quay-org-name, quay-org-token, gh-app-id,
         gh-app-private-key, gh-app-webhook-secret, smee-channel.
+    - name: test-user
+      type: string
+      description: >-
+        Dex demo user used by Cypress (must match CYPRESS_USERNAME).
+        Granted konflux-admin-user-actions in default-tenant so secrets /
+        user-access / app-delete flows work (same as GHA deploy-test action).
+      default: user2@konflux.dev
   volumes:
     - name: cluster-credentials
       secret:
@@ -90,6 +97,8 @@ spec:
       env:
         - name: OPERATOR_RELEASE
           value: $(params.operator-release)
+        - name: TEST_USER
+          value: $(params.test-user)
       script: |
         #!/usr/bin/env bash
         set -euo pipefail
@@ -140,6 +149,38 @@ spec:
             kubectl get konflux konflux -o yaml | head -120 || true
             exit 1
           fi
+
+          # --- Post-deploy e2e prep (mirrors .github/actions/konflux-ui-deploy-test) ---
+
+          # Enable image-controller integration in public info (Secrets / quay flows).
+          echo "[INFO] Patching konflux-public-info image_controller.enabled=true"
+          for _ in $(seq 1 60); do
+            if kubectl get configmap konflux-public-info -n konflux-info >/dev/null 2>&1; then
+              break
+            fi
+            sleep 2
+          done
+          if ! kubectl get configmap konflux-public-info -n konflux-info >/dev/null 2>&1; then
+            echo "ERROR: konflux-public-info ConfigMap not found in konflux-info after wait"
+            kubectl get ns konflux-info -o yaml || true
+            kubectl get cm -n konflux-info || true
+            exit 1
+          fi
+          kubectl get configmap konflux-public-info -n konflux-info -o json \
+            | jq '.data["info.json"] = (.data["info.json"] | fromjson | .integrations.image_controller.enabled = true | tojson)' \
+            | kubectl apply -f -
+
+          # Grant Cypress user admin in default-tenant (secrets list, user-access, delete app).
+          # ClusterRole already exists from the operator install; we only bind it.
+          echo "[INFO] Waiting for default-tenant namespace..."
+          kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/default-tenant --timeout=5m
+          echo "[INFO] Binding konflux-admin-user-actions to ${TEST_USER} in default-tenant"
+          kubectl create rolebinding user2-konflux-admin \
+            --clusterrole=konflux-admin-user-actions \
+            --user="${TEST_USER}" \
+            -n default-tenant \
+            --dry-run=client -o yaml | kubectl apply -f -
+          kubectl get rolebinding user2-konflux-admin -n default-tenant -o wide
 
           kubectl get po -A || true
         } 2>&1 | tee -a "${LOG_FILENAME}"
