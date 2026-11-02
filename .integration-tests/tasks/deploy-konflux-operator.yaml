@@ -47,8 +47,9 @@ spec:
     - name: container-image
       type: string
       description: >-
-        SNAPSHOT UI image (test-metadata container-image) injected into
-        deployment/proxy initContainer copy-static-content.
+        Instrumented UI image to inject into deployment/proxy initContainer
+        copy-static-content (e.g. …/operator:instrumented-<sha>). Not the
+        SNAPSHOT primary digest — that is the non-instrumented build.
     - name: pull-secret
       type: string
       description: >-
@@ -169,23 +170,12 @@ spec:
             | kubectl apply -f -
 
           # Operator creates default-tenant with maintainer for system:authenticated.
-          # Cypress (user2) needs admin for secrets / delete-app (ClusterRole already installed).
-          echo "[INFO] Applying admin RoleBinding for user2@konflux.dev in default-tenant"
-          kubectl apply -f - <<'EOF'
-        apiVersion: rbac.authorization.k8s.io/v1
-        kind: RoleBinding
-        metadata:
-          name: user2-konflux-admin
-          namespace: default-tenant
-        roleRef:
-          apiGroup: rbac.authorization.k8s.io
-          kind: ClusterRole
-          name: konflux-admin-user-actions
-        subjects:
-          - kind: User
-            name: user2@konflux.dev
-            apiGroup: rbac.authorization.k8s.io
-        EOF
+          # Cypress (user2) needs admin for secrets / delete-app
+          echo "[INFO] Binding konflux-admin-user-actions to user2@konflux.dev in default-tenant"
+          kubectl create rolebinding user2-konflux-admin \
+            --clusterrole=konflux-admin-user-actions \
+            --user=user2@konflux.dev \
+            -n default-tenant
         } 2>&1 | tee -a "${LOG_FILENAME}"
 
     - name: inject-ui-image
@@ -204,11 +194,11 @@ spec:
         {
           # Scale operator down first so it cannot reconcile the stock image
           # back onto deployment/proxy.
-          echo "=== Inject SNAPSHOT UI image into deployment/proxy ==="
+          echo "=== Inject instrumented UI image into deployment/proxy ==="
           KIND_PULL_SECRET_NAME=snapshot-ui-pull
 
           if [[ -z "${CONTAINER_IMAGE}" ]]; then
-            echo "ERROR: container-image param is empty; expected SNAPSHOT image"
+            echo "ERROR: container-image param is empty; expected instrumented UI image"
             exit 1
           fi
 
@@ -219,7 +209,7 @@ spec:
             exit 1
           fi
 
-          echo "[INFO] SNAPSHOT image: ${CONTAINER_IMAGE}"
+          echo "[INFO] Instrumented UI image: ${CONTAINER_IMAGE}"
 
           echo "[INFO] Scaling down konflux-operator"
           if kubectl get deployment/konflux-operator-controller-manager -n konflux-operator &>/dev/null; then
