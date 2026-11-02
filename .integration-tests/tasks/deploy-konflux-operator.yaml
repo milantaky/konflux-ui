@@ -107,7 +107,7 @@ spec:
           echo "=== Deploy Konflux via scripts/deploy-local.sh ==="
           kubectl cluster-info
 
-          # Map IT build-credentials secret keys → deploy-local.sh / deploy-secrets.sh env.
+          # Map IT build-credentials → deploy-local.sh / deploy-secrets.sh env.
           export GITHUB_APP_ID=$(< /build-credentials/gh-app-id)
           export GITHUB_PRIVATE_KEY=$(< /build-credentials/gh-app-private-key)
           export WEBHOOK_SECRET=$(< /build-credentials/gh-app-webhook-secret)
@@ -115,8 +115,8 @@ spec:
           export QUAY_ORGANIZATION=$(< /build-credentials/quay-org-name)
           export SMEE_CHANNEL=$(< /build-credentials/smee-channel)
 
-          # Kind already provisioned by the pipeline (mapt). Same operator path as
-          # .github/actions/konflux-ui-deploy-test. Quay env auto-selects konflux-e2e.yaml.
+          # Kind already provisioned by the pipeline (mapt). Same path as
+          # .github/actions/konflux-ui-deploy-test.
           export DEPLOY_LOCAL_SKIP_KIND=1
           export OPERATOR_INSTALL_METHOD=release
           export OPERATOR_RELEASE
@@ -124,11 +124,8 @@ spec:
 
           ./scripts/deploy-local.sh
 
-          # Cypress reaches the UI via Kind node IP:9443 (run-e2e retrieve-local-url).
-          # Release samples configure oauth2-proxy/Dex for localhost:9443 (local Kind / GHA).
-          # Point ingress.fqdn at the node IP so OIDC redirects match the URL Cypress uses
-          # (legacy deploy-konflux-ci did the equivalent with sed on dex/proxy manifests).
-          # NOTE: released operator CRD field is ingress.fqdn (not the older ingress.host).
+          # Cypress hits Kind node IP:9443; release samples default to localhost:9443.
+          # Patch ingress.fqdn so OIDC redirects match (CRD field is ingress.fqdn).
           KUBE_SERVER=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}')
           KIND_IP=$(sed -E 's|https?://([^:/]+).*|\1|' <<< "${KUBE_SERVER}")
           UI_HOST="${KIND_IP}:9443"
@@ -143,29 +140,15 @@ spec:
           GET_LINE=$(kubectl get konflux konflux -o wide --no-headers 2>/dev/null || true)
           echo "[INFO] Konflux after fqdn patch: ${GET_LINE}"
           if [[ "${GET_LINE}" == *localhost* ]] || [[ "${GET_LINE}" != *"${KIND_IP}"* ]]; then
-            echo "ERROR: UI URL did not switch to Kind IP ${KIND_IP} after ingress.fqdn=${UI_HOST}"
-            echo "       Got: ${GET_LINE}"
-            echo "       OIDC redirects will not match Cypress (chrome-error / missing login button)."
+            echo "ERROR: UI URL did not switch to Kind IP ${KIND_IP} (got: ${GET_LINE})"
             kubectl get konflux konflux -o yaml | head -120 || true
             exit 1
           fi
 
           # --- Post-deploy e2e prep (mirrors .github/actions/konflux-ui-deploy-test) ---
 
-          # Enable image-controller integration in public info (Secrets / quay flows).
+          # Enable image-controller in public info (Secrets / quay flows).
           echo "[INFO] Patching konflux-public-info image_controller.enabled=true"
-          for _ in $(seq 1 60); do
-            if kubectl get configmap konflux-public-info -n konflux-info >/dev/null 2>&1; then
-              break
-            fi
-            sleep 2
-          done
-          if ! kubectl get configmap konflux-public-info -n konflux-info >/dev/null 2>&1; then
-            echo "ERROR: konflux-public-info ConfigMap not found in konflux-info after wait"
-            kubectl get ns konflux-info -o yaml || true
-            kubectl get cm -n konflux-info || true
-            exit 1
-          fi
           kubectl get configmap konflux-public-info -n konflux-info -o json \
             | jq '.data["info.json"] = (.data["info.json"] | fromjson | .integrations.image_controller.enabled = true | tojson)' \
             | kubectl apply -f -
