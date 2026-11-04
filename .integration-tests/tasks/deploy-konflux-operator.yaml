@@ -224,7 +224,7 @@ spec:
             kubectl scale deployment/konflux-operator-controller-manager \
               -n konflux-operator --replicas=0
             kubectl wait --for=delete pod -l control-plane=controller-manager \
-              -n konflux-operator --timeout=2m
+              -n konflux-operator --timeout=2m || true
           else
             echo "=== konflux-operator-controller-manager not found; continuing ==="
           fi
