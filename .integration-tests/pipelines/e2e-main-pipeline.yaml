@@ -3,7 +3,7 @@ apiVersion: tekton.dev/v1
 kind: Pipeline
 metadata:
   name: e2e-main-pipeline
-  namespace: konflux-ui-tenant
+  namespace: mtakac-tenant
 spec:
   params:
     - name: SNAPSHOT
@@ -69,7 +69,7 @@ spec:
         Image repository without tag for e2e runner and instrumented UI builds.
         Must match the operator build pipeline outputs
         (e2e[-on-pr]-<sha>, instrumented[-on-pr]-<sha>).
-      default: 'quay.io/redhat-user-workloads/konflux-ui-tenant/konflux-ui/konflux-ui'
+      default: 'quay.io/redhat-user-workloads-stage/mtakac-tenant/fixi-pls'
       type: string
     - name: enable-coverage
       description: >-
