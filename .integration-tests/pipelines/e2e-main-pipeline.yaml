@@ -205,10 +205,13 @@ spec:
       taskRef:
         resolver: git
         params:
+          # Same fork/branch as run-e2e so the smee→PaC downstream patch is used.
+          # konflux-ci@main still points smee at kind-node:8180 (broken for on-pull).
+          # Revert to konflux-ci/konflux-ui@main after that fix merges upstream.
           - name: url
-            value: https://github.com/konflux-ci/konflux-ui
+            value: https://github.com/milantaky/konflux-ui
           - name: revision
-            value: main
+            value: fix/tests-e2e
           - name: pathInRepo
             value: .integration-tests/tasks/deploy-konflux-operator.yaml
       params:

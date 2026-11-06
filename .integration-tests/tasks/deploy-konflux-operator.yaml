@@ -184,6 +184,32 @@ spec:
             --clusterrole=konflux-admin-user-actions \
             --user=user2@konflux.dev \
             -n default-tenant
+
+          # deploy-local.sh rewrites smee sidecar DOWNSTREAM to http://<kind-node-ip>:8180,
+          # but PaC listens on NodePort 30012 (not host :8180). From inside the cluster that
+          # URL times out, so GitHub webhooks never reach PaC and on-pull PipelineRuns never
+          # appear. Point the sidecar at the in-cluster Service DNS instead.
+          echo "=== Patching smee → PaC downstream (Service DNS) ==="
+          if kubectl get deployment/gosmee-client -n smee-client &>/dev/null \
+            && kubectl get svc pipelines-as-code-controller -n pipelines-as-code &>/dev/null; then
+            PAC_DOWNSTREAM="http://pipelines-as-code-controller.pipelines-as-code:8180"
+            CURRENT=$(kubectl get deployment/gosmee-client -n smee-client -o jsonpath='{range .spec.template.spec.containers[?(@.name=="health-check-sidecar")].env[?(@.name=="DOWNSTREAM_SERVICE_URL")]}{.value}{end}')
+            echo "Current DOWNSTREAM_SERVICE_URL: ${CURRENT:-<unset>}"
+            echo "Target DOWNSTREAM_SERVICE_URL: ${PAC_DOWNSTREAM}"
+            if [[ "${CURRENT}" != "${PAC_DOWNSTREAM}" ]]; then
+              kubectl set env deployment/gosmee-client -n smee-client \
+                -c health-check-sidecar \
+                "DOWNSTREAM_SERVICE_URL=${PAC_DOWNSTREAM}"
+              kubectl rollout status deployment/gosmee-client -n smee-client --timeout=3m
+            else
+              echo "Already correct — no patch needed."
+            fi
+            kubectl get svc pipelines-as-code-controller -n pipelines-as-code || true
+          else
+            echo "WARNING: smee or PaC service missing; skipping downstream patch"
+            kubectl get deploy,po -n smee-client || true
+            kubectl get svc -n pipelines-as-code || true
+          fi
         } 2>&1 | tee -a "${LOG_FILENAME}"
 
     - name: inject-ui-image
