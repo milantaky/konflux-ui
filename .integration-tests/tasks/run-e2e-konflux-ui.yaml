@@ -283,6 +283,8 @@ spec:
           export CYPRESS_HAC_NAMESPACE=default-tenant
         fi
         echo "Konflux base URL: ${CYPRESS_KONFLUX_BASE_URL}"
+        echo "HAC_NAMESPACE: ${CYPRESS_HAC_NAMESPACE:-<unset>}"
+        echo "LOCAL_CLUSTER: ${CYPRESS_LOCAL_CLUSTER:-<unset>}"
 
         echo "=== Selecting E2E test sources ==="
         SPEC_FILE="$(params.spec-file)"
