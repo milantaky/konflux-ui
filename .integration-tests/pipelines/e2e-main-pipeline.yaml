@@ -245,8 +245,9 @@ spec:
           - name: pathInRepo
             value: .integration-tests/tasks/monitor-webhook-logs.yaml
       params:
+        # Cover component create + 5m on-pull wait (5m was ending too early).
         - name: monitoring-duration
-          value: '5m'
+          value: '20m'
 
     - name: run-e2e-konflux-ui
       runAfter:
