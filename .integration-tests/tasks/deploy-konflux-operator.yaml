@@ -185,59 +185,59 @@ spec:
             --user=user2@konflux.dev \
             -n default-tenant
 
-          # Ensure smee sidecar forwards to the in-cluster PaC Service.
-          # Stock smee defaults to tekton-pipelines:8080 (current konflux-ci). Older
-          # stacks used pipelines-as-code:8180 or openshift-pipelines:8080. Some
-          # deploy paths rewrote DOWNSTREAM to http://<kind-node-ip>:8180, which
-          # times out on remote kind (mapt) and blocks on-pull PipelineRuns.
-          echo "=== Patching smee → PaC downstream (Service DNS) ==="
-          if ! kubectl get deployment/gosmee-client -n smee-client &>/dev/null; then
-            echo "ERROR: deployment/gosmee-client missing in smee-client"
-            kubectl get deploy,po -A || true
-            exit 1
-          fi
+          # # Ensure smee sidecar forwards to the in-cluster PaC Service.
+          # # Stock smee defaults to tekton-pipelines:8080 (current konflux-ci). Older
+          # # stacks used pipelines-as-code:8180 or openshift-pipelines:8080. Some
+          # # deploy paths rewrote DOWNSTREAM to http://<kind-node-ip>:8180, which
+          # # times out on remote kind (mapt) and blocks on-pull PipelineRuns.
+          # echo "=== Patching smee → PaC downstream (Service DNS) ==="
+          # if ! kubectl get deployment/gosmee-client -n smee-client &>/dev/null; then
+          #   echo "ERROR: deployment/gosmee-client missing in smee-client"
+          #   kubectl get deploy,po -A || true
+          #   exit 1
+          # fi
 
-          CURRENT=$(kubectl get deployment/gosmee-client -n smee-client -o jsonpath='{range .spec.template.spec.containers[?(@.name=="health-check-sidecar")].env[?(@.name=="DOWNSTREAM_SERVICE_URL")]}{.value}{end}')
-          echo "Current DOWNSTREAM_SERVICE_URL: ${CURRENT:-<unset>}"
-          echo "=== Candidate PaC services ==="
-          kubectl get svc -A --no-headers 2>/dev/null | grep -i 'pipelines-as-code' || true
+          # CURRENT=$(kubectl get deployment/gosmee-client -n smee-client -o jsonpath='{range .spec.template.spec.containers[?(@.name=="health-check-sidecar")].env[?(@.name=="DOWNSTREAM_SERVICE_URL")]}{.value}{end}')
+          # echo "Current DOWNSTREAM_SERVICE_URL: ${CURRENT:-<unset>}"
+          # echo "=== Candidate PaC services ==="
+          # kubectl get svc -A --no-headers 2>/dev/null | grep -i 'pipelines-as-code' || true
 
-          PAC_NS=""
-          PAC_PORT=""
-          for ns in tekton-pipelines openshift-pipelines pipelines-as-code; do
-            if kubectl get svc pipelines-as-code-controller -n "${ns}" &>/dev/null; then
-              PAC_NS="${ns}"
-              PAC_PORT=$(kubectl get svc pipelines-as-code-controller -n "${ns}" \
-                -o jsonpath='{.spec.ports[0].port}')
-              break
-            fi
-          done
+          # PAC_NS=""
+          # PAC_PORT=""
+          # for ns in tekton-pipelines openshift-pipelines pipelines-as-code; do
+          #   if kubectl get svc pipelines-as-code-controller -n "${ns}" &>/dev/null; then
+          #     PAC_NS="${ns}"
+          #     PAC_PORT=$(kubectl get svc pipelines-as-code-controller -n "${ns}" \
+          #       -o jsonpath='{.spec.ports[0].port}')
+          #     break
+          #   fi
+          # done
 
-          if [[ -z "${PAC_NS}" || -z "${PAC_PORT}" ]]; then
-            echo "ERROR: pipelines-as-code-controller Service not found"
-            kubectl get svc -A || true
-            kubectl get po -A | grep -iE 'pipelines-as-code|pac' || true
-            exit 1
-          fi
+          # if [[ -z "${PAC_NS}" || -z "${PAC_PORT}" ]]; then
+          #   echo "ERROR: pipelines-as-code-controller Service not found"
+          #   kubectl get svc -A || true
+          #   kubectl get po -A | grep -iE 'pipelines-as-code|pac' || true
+          #   exit 1
+          # fi
 
-          PAC_DOWNSTREAM="http://pipelines-as-code-controller.${PAC_NS}:${PAC_PORT}"
-          echo "Discovered PaC: ${PAC_NS}/pipelines-as-code-controller:${PAC_PORT}"
-          echo "Target DOWNSTREAM_SERVICE_URL: ${PAC_DOWNSTREAM}"
-          kubectl get svc pipelines-as-code-controller -n "${PAC_NS}" -o wide || true
-          kubectl get po -n "${PAC_NS}" -l app.kubernetes.io/name=controller -o wide 2>/dev/null \
-            || kubectl get po -n "${PAC_NS}" | grep -i pipelines-as-code || true
+          # PAC_DOWNSTREAM="http://pipelines-as-code-controller.${PAC_NS}:${PAC_PORT}"
+          # echo "Discovered PaC: ${PAC_NS}/pipelines-as-code-controller:${PAC_PORT}"
+          # echo "Target DOWNSTREAM_SERVICE_URL: ${PAC_DOWNSTREAM}"
+          # kubectl get svc pipelines-as-code-controller -n "${PAC_NS}" -o wide || true
+          # kubectl get po -n "${PAC_NS}" -l app.kubernetes.io/name=controller -o wide 2>/dev/null \
+          #   || kubectl get po -n "${PAC_NS}" | grep -i pipelines-as-code || true
 
-          if [[ "${CURRENT}" != "${PAC_DOWNSTREAM}" ]]; then
-            kubectl set env deployment/gosmee-client -n smee-client \
-              -c health-check-sidecar \
-              "DOWNSTREAM_SERVICE_URL=${PAC_DOWNSTREAM}"
-            kubectl rollout status deployment/gosmee-client -n smee-client --timeout=3m
-          else
-            echo "Already correct — no patch needed."
-          fi
+          # if [[ "${CURRENT}" != "${PAC_DOWNSTREAM}" ]]; then
+          #   kubectl set env deployment/gosmee-client -n smee-client \
+          #     -c health-check-sidecar \
+          #     "DOWNSTREAM_SERVICE_URL=${PAC_DOWNSTREAM}"
+          #   kubectl rollout status deployment/gosmee-client -n smee-client --timeout=3m
+          # else
+          #   echo "Already correct — no patch needed."
+          # fi
 
-          PATCHED=$(kubectl get deployment/gosmee-client -n smee-client -o jsonpath='{range .spec.template.spec.containers[?(@.name=="health-check-sidecar")].env[?(@.name=="DOWNSTREAM_SERVICE_URL")]}{.value}{end}')
-          echo "Patched DOWNSTREAM_SERVICE_URL: ${PATCHED:-<unset>}"
+          # PATCHED=$(kubectl get deployment/gosmee-client -n smee-client -o jsonpath='{range .spec.template.spec.containers[?(@.name=="health-check-sidecar")].env[?(@.name=="DOWNSTREAM_SERVICE_URL")]}{.value}{end}')
+          # echo "Patched DOWNSTREAM_SERVICE_URL: ${PATCHED:-<unset>}"
         } 2>&1 | tee -a "${LOG_FILENAME}"
 
     - name: inject-ui-image
