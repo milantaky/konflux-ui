@@ -376,60 +376,60 @@ spec:
         echo "Artifacts collected:"
         ls -lah /artifacts/
 
-        # On failure, dump PaC/smee/Repository state to explain missing on-pull PLRs.
-        # (DOWNSTREAM can be correct while GitHub→smee→PaC still drops events.)
-        if [ ${TEST_RESULT} -ne 0 ] && [ "$(params.job-type)" != "periodic-stage" ]; then
-          echo ""
-          echo "=== Diagnostics: webhook / PaC / Repository (on-pull missing?) ==="
-          DIAG=/artifacts/pac-smee-diagnostics.log
-          {
-            PIPELINE_RUN_NAME="$(params.pipeline-run-name)"
-            NAMESPACE="${TEKTON_NAMESPACE:-}"
-            if [ -z "${NAMESPACE}" ]; then
-              NAMESPACE=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace 2>/dev/null || true)
-            fi
-            SECRET_NAME="kfg-${PIPELINE_RUN_NAME}"
-            echo "PipelineRun=${PIPELINE_RUN_NAME} Namespace=${NAMESPACE} Secret=${SECRET_NAME}"
-            if kubectl get secret "${SECRET_NAME}" -n "${NAMESPACE}" &>/dev/null; then
-              kubectl get secret "${SECRET_NAME}" -n "${NAMESPACE}" -o jsonpath='{.data.kubeconfig}' \
-                | base64 -d | install -m 0600 /dev/stdin /tmp/kubeconfig-diag
-              export KUBECONFIG=/tmp/kubeconfig-diag
+        # # On failure, dump PaC/smee/Repository state to explain missing on-pull PLRs.
+        # # (DOWNSTREAM can be correct while GitHub→smee→PaC still drops events.)
+        # if [ ${TEST_RESULT} -ne 0 ] && [ "$(params.job-type)" != "periodic-stage" ]; then
+        #   echo ""
+        #   echo "=== Diagnostics: webhook / PaC / Repository (on-pull missing?) ==="
+        #   DIAG=/artifacts/pac-smee-diagnostics.log
+        #   {
+        #     PIPELINE_RUN_NAME="$(params.pipeline-run-name)"
+        #     NAMESPACE="${TEKTON_NAMESPACE:-}"
+        #     if [ -z "${NAMESPACE}" ]; then
+        #       NAMESPACE=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace 2>/dev/null || true)
+        #     fi
+        #     SECRET_NAME="kfg-${PIPELINE_RUN_NAME}"
+        #     echo "PipelineRun=${PIPELINE_RUN_NAME} Namespace=${NAMESPACE} Secret=${SECRET_NAME}"
+        #     if kubectl get secret "${SECRET_NAME}" -n "${NAMESPACE}" &>/dev/null; then
+        #       kubectl get secret "${SECRET_NAME}" -n "${NAMESPACE}" -o jsonpath='{.data.kubeconfig}' \
+        #         | base64 -d | install -m 0600 /dev/stdin /tmp/kubeconfig-diag
+        #       export KUBECONFIG=/tmp/kubeconfig-diag
 
-              echo "--- gosmee DOWNSTREAM ---"
-              kubectl get deployment/gosmee-client -n smee-client -o jsonpath='{range .spec.template.spec.containers[?(@.name=="health-check-sidecar")].env[?(@.name=="DOWNSTREAM_SERVICE_URL")]}{.value}{end}' || true
-              echo
+        #       echo "--- gosmee DOWNSTREAM ---"
+        #       kubectl get deployment/gosmee-client -n smee-client -o jsonpath='{range .spec.template.spec.containers[?(@.name=="health-check-sidecar")].env[?(@.name=="DOWNSTREAM_SERVICE_URL")]}{.value}{end}' || true
+        #       echo
 
-              echo "--- smee pod logs (last 80) ---"
-              SMEE_POD=$(kubectl get pod -n smee-client -l app=gosmee-client -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
-              if [ -n "${SMEE_POD}" ]; then
-                kubectl logs -n smee-client "${SMEE_POD}" --all-containers --tail=80 --timestamps 2>&1 || true
-              else
-                echo "no smee pod"
-              fi
+        #       echo "--- smee pod logs (last 80) ---"
+        #       SMEE_POD=$(kubectl get pod -n smee-client -l app=gosmee-client -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+        #       if [ -n "${SMEE_POD}" ]; then
+        #         kubectl logs -n smee-client "${SMEE_POD}" --all-containers --tail=80 --timestamps 2>&1 || true
+        #       else
+        #         echo "no smee pod"
+        #       fi
 
-              echo "--- PaC controller logs (last 80) ---"
-              for ns in tekton-pipelines openshift-pipelines pipelines-as-code; do
-                PAC_POD=$(kubectl get pod -n "${ns}" -l app.kubernetes.io/name=controller,app.kubernetes.io/part-of=pipelines-as-code -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
-                if [ -n "${PAC_POD}" ]; then
-                  echo "ns=${ns} pod=${PAC_POD}"
-                  kubectl logs -n "${ns}" "${PAC_POD}" --tail=80 --timestamps 2>&1 || true
-                  break
-                fi
-              done
+        #       echo "--- PaC controller logs (last 80) ---"
+        #       for ns in tekton-pipelines openshift-pipelines pipelines-as-code; do
+        #         PAC_POD=$(kubectl get pod -n "${ns}" -l app.kubernetes.io/name=controller,app.kubernetes.io/part-of=pipelines-as-code -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+        #         if [ -n "${PAC_POD}" ]; then
+        #           echo "ns=${ns} pod=${PAC_POD}"
+        #           kubectl logs -n "${ns}" "${PAC_POD}" --tail=80 --timestamps 2>&1 || true
+        #           break
+        #         fi
+        #       done
 
-              echo "--- Repository CRs (all ns) ---"
-              kubectl get repository -A -o wide 2>&1 || true
+        #       echo "--- Repository CRs (all ns) ---"
+        #       kubectl get repository -A -o wide 2>&1 || true
 
-              echo "--- PipelineRuns in default-tenant ---"
-              kubectl get pipelinerun -n default-tenant -o wide 2>&1 || true
+        #       echo "--- PipelineRuns in default-tenant ---"
+        #       kubectl get pipelinerun -n default-tenant -o wide 2>&1 || true
 
-              echo "--- Components in default-tenant ---"
-              kubectl get components.appstudio.redhat.com -n default-tenant -o wide 2>&1 || true
-            else
-              echo "WARN: kind kubeconfig secret ${SECRET_NAME} not found; skip cluster diagnostics"
-            fi
-          } 2>&1 | tee "${DIAG}"
-        fi
+        #       echo "--- Components in default-tenant ---"
+        #       kubectl get components.appstudio.redhat.com -n default-tenant -o wide 2>&1 || true
+        #     else
+        #       echo "WARN: kind kubeconfig secret ${SECRET_NAME} not found; skip cluster diagnostics"
+        #     fi
+        #   } 2>&1 | tee "${DIAG}"
+        # fi
 
         # Now exit with the test result
         echo ""
