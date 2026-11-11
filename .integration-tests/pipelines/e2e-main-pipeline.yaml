@@ -289,8 +289,6 @@ spec:
           value: $(tasks.test-metadata.results.source-repo-branch)
         - name: commit-info-author
           value: $(tasks.test-metadata.results.pull-request-author)
-        - name: target-branch
-          value: $(tasks.test-metadata.results.target-repo-branch)
         - name: target-repo-url
           value: https://github.com/$(tasks.test-metadata.results.git-org)/$(tasks.test-metadata.results.git-repo)
         - name: pipeline-run-name
