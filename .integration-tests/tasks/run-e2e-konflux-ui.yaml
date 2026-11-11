@@ -262,6 +262,11 @@ spec:
               key: record-key
         - name: LOCAL_KONFLUX_BASE_URL
           value: $(steps.retrieve-local-url.results.base-url)
+        # COMMIT_INFO_* helps Cypress Cloud attribute the run to the right commit
+        - name: COMMIT_INFO_SHA
+          value: $(params.git-revision)
+        - name: COMMIT_INFO_BRANCH
+          value: $(params.target-branch)
       script: |
         #!/usr/bin/env bash
         # Note: NOT using 'set -e' so script continues after test failure
@@ -310,12 +315,27 @@ spec:
         fi
         echo "Coverage collection: ${ENABLE_COVERAGE}"
 
+        # Cypress Cloud recording (mirrors pr_check.sh). Enabled for periodic-stage
+        # so stage failures are debuggable via Cloud run history / Test Replay.
+        RECORD_ARGS=()
+        if [ "$(params.job-type)" = "periodic-stage" ]; then
+          if [ -n "${CYPRESS_PROJECT_ID:-}" ] && [ -n "${CYPRESS_RECORD_KEY:-}" ]; then
+            JOB_TAG="$(params.job-type)"
+            RECORD_ARGS+=(--record --tag "${JOB_TAG}")
+            echo "Cypress Cloud recording enabled with tag: ${JOB_TAG}"
+            echo "COMMIT_INFO_SHA: '${COMMIT_INFO_SHA:-}'"
+            echo "COMMIT_INFO_BRANCH: '${COMMIT_INFO_BRANCH:-}'"
+          else
+            echo "Cypress Cloud recording skipped (missing PROJECT_ID or RECORD_KEY)"
+          fi
+        fi
+
         # Run tests and capture exit code (don't exit on failure)
         set +e
         if [ "${ENABLE_COVERAGE}" = "true" ]; then
-          yarn run cy:run:coverage --spec "${SPEC_FILE}"
+          yarn run cy:run:coverage --spec "${SPEC_FILE}" "${RECORD_ARGS[@]}"
         else
-          yarn run cy:run --spec "${SPEC_FILE}"
+          yarn run cy:run --spec "${SPEC_FILE}" "${RECORD_ARGS[@]}"
         fi
         TEST_RESULT=$?
         set -e
