@@ -186,10 +186,6 @@ spec:
           value: $(params.oci-container-repo):$(context.pipelineRun.name)
         - name: oci-credentials
           value: $(params.oci-credentials-secret)
-        # - name: cpus
-        #   value: '4'
-        # - name: memory
-        #   value: '16'
 
     # Operator-based install (KFLUXUI-1783). Injects the instrumented UI image
     # into deployment/proxy (operator has no UI image field; scaled down so it
@@ -247,7 +243,7 @@ spec:
       params:
         # Cover component create + 5m on-pull wait (5m was ending too early).
         - name: monitoring-duration
-          value: '20m'
+          value: '5m'
 
     - name: run-e2e-konflux-ui
       runAfter:
