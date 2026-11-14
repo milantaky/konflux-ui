@@ -22170,8 +22170,8 @@ __metadata:
   linkType: hard
 
 "zustand@npm:^5.0.4":
-  version: 5.0.15
-  resolution: "zustand@npm:5.0.15"
+  version: 5.1.0
+  resolution: "zustand@npm:5.1.0"
   peerDependencies:
     "@types/react": ">=18.0.0"
     immer: ">=9.0.6"
@@ -22186,7 +22186,7 @@ __metadata:
       optional: true
     use-sync-external-store:
       optional: true
-  checksum: 10/5124e93d8f57483985981ea9795df6872991f0693eb3730d562b3cb09e72af8a892703f2610744e5814b2045f7373df3d6f80625a646197d700572f2c7f70db3
+  checksum: 10/e61f77a22c5db4695f30cb23fcb98ea9f81a6c4ed6c1188d163a5c69a385d013e3d382d819fa2797f7161862460553346b7941e7e9ac2d2b6ac27d7c3487b57b
   languageName: node
   linkType: hard
 
