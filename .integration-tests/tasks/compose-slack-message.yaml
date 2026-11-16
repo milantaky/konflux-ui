@@ -1,0 +1,63 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: compose-slack-message
+  annotations:
+    tekton.dev/displayName: 'Compose Slack Message'
+    tekton.dev/categories: 'Notification'
+    tekton.dev/tags: 'slack,notification'
+spec:
+  description: >-
+    Compose a Slack notification message from pipeline status, job metadata,
+    and a job URL. Writes the message to a result for a downstream sender task.
+  params:
+    - name: pipeline-aggregate-status
+      type: string
+      description: 'The aggregate status of the pipeline (Succeeded, Failed, Completed, None)'
+    - name: test-name
+      type: string
+      description: 'Name of the test/pipeline run'
+    - name: job-type
+      type: string
+      description: 'Type of job (pr-check, periodic-local, periodic-stage, etc.)'
+    - name: job-url
+      type: string
+      description: 'URL to the PipelineRun (appended to the message)'
+  results:
+    - name: message
+      description: 'Composed Slack notification message'
+  steps:
+    - name: compose
+      image: registry.access.redhat.com/ubi9/ubi-minimal@sha256:d91be7cea9f03a757d69ad7fcdfcd7849dba820110e7980d5e2a1f46ed06ea3b
+      computeResources:
+        requests:
+          memory: 32Mi
+          cpu: 10m
+        limits:
+          memory: 64Mi
+      env:
+        - name: PIPELINE_STATUS
+          value: $(params.pipeline-aggregate-status)
+        - name: TEST_NAME
+          value: $(params.test-name)
+        - name: JOB_TYPE
+          value: $(params.job-type)
+        - name: JOB_URL
+          value: $(params.job-url)
+      script: |
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        if [[ "${PIPELINE_STATUS}" == "Succeeded" || "${PIPELINE_STATUS}" == "Completed" ]]; then
+          EMOJI=":white_check_mark:"
+        else
+          EMOJI=":x:"
+        fi
+
+        # Format date as "MMM D", e.g., "Jun 3"
+        REPORT_DATE=$(date '+%b %-d')
+
+        MESSAGE="KONFLUX: ${EMOJI} Report ${REPORT_DATE}: ${JOB_TYPE} - ${TEST_NAME} ${JOB_URL}"
+
+        echo "Composed message: ${MESSAGE}"
+        printf '%s' "${MESSAGE}" > "$(results.message.path)"
