@@ -177,64 +177,33 @@ Test automation allows us to test early in the process and discover bugs before 
 
 ### PR checks
 
-Cypress E2E tests run on pull requests via two paths:
+Cypress E2E tests on pull requests run via the Konflux integration pipeline (`.integration-tests/pipelines/e2e-main-pipeline.yaml`) with `job-type=pr-check` (the pipeline default), using the `run-e2e-konflux-ui` Tekton task.
 
-1. **GitHub Action** — [`.github/workflows/pr-check.yaml`](../.github/workflows/pr-check.yaml) (requires public membership in the `konflux-ci` organization)
-2. **Konflux integration pipeline** — `.integration-tests/pipelines/e2e-main-pipeline.yaml` with `job-type=pr-check` (default)
+On each PR build, Konflux produces parallel image tags (`instrumented-on-pr-<sha>` for the UI under test, `e2e-on-pr-<sha>` for the Cypress runner). The integration pipeline then:
 
-#### GitHub Action
-
-The job installs Konflux from a main branch and Konflux UI from a PR. It runs tests, gathers logs, and allows users to download them directly from the GitHub Action Summary page. Retriggering the job is possible either by pushing a commit to the branch or trigger it directly in the GitHub Action Summary page by `Re-run jobs` button.
-
-> [!IMPORTANT]
-> The direct changes in the GitHub Action file `pr-check.yaml` won't be executed in a PR - that's intended due to security reasons. If you do change in this file, you should test it in your fork.
->
-> This feature is caused by a trigger which is set as:
->
-> ```
-> on:
->   pull_request_target:
->     types: [opened, synchronize, reopened, labeled]
-> ```
-
-The workflow is separated into the actions files within `.github/actions` directory. Each action is a composite action, which makes it reusable across multiple workflows. This way it's also visible as separated steps and is easier for debugging.
-
-The job installs Konflux from the konflux-ci main branch. Konflux UI with all the changes introduced in a PR is build into an image which is deployed on local a kind cluster (image is not pushed anywhere).
-
-The test step executes `pr_check.sh` file which does the tests setup and runs tests. Changes made in this bash file are already propagated to the PR check run, so they can be tested directly by the PR check job. If the Containerfile is changed, the image is rebuilt (not pushed). Environment variables are set and tests are run with the test code mounted from the PR to ensure it contains a fresh code.
-
-#### Konflux integration pipeline
-
-Konflux runs E2E tests via the integration pipeline (`.integration-tests/pipelines/e2e-main-pipeline.yaml`) using the `run-e2e-konflux-ui` Tekton task. The pipeline is parameterized by `job-type` (`pr-check`, `periodic-local`, or `periodic-stage`); for pull requests it uses `pr-check`.
-
-**Image resolution and deploy (skipped for `periodic-stage`):**
-
-1. `format-images` resolves the parallel build tags (`instrumented[-on-pr]-<sha>` for the UI under test, `e2e[-on-pr]-<sha>` for the Cypress runner) — SNAPSHOT's primary `containerImage` is the non-instrumented digest and is not used for deploy.
+1. `format-images` resolves those tags from the SNAPSHOT revision — SNAPSHOT's primary `containerImage` is the non-instrumented digest and is not used for deploy.
 2. `provision-kind-cluster` creates a Kind cluster on AWS spot.
-3. `deploy-konflux` installs Konflux via the operator and injects that instrumented UI image into `deployment/proxy` (initContainer `copy-static-content`), with a pull secret so Kind can pull it.
+3. `deploy-konflux` installs Konflux via the operator and injects the instrumented UI image into `deployment/proxy` (initContainer `copy-static-content`), with a pull secret so Kind can pull it.
 4. `monitor-webhook-logs` runs in parallel with the E2E task and captures smee-client / pipelines-as-code controller logs for webhook debugging.
+5. `run-e2e-konflux-ui` runs Cypress from the image-baked sources at `/tmp/e2e` against `https://<kind-ip>:9443` (`LOCAL_CLUSTER=true`).
 
-**Test execution (`run-e2e-konflux-ui`):**
+Default specs are `tests/component-lifecycle.spec.ts,tests/environment-config.spec.ts` (override via `spec-file`). When Cypress Cloud credentials are present, runs are recorded with `--record` and tagged `pr-check`. Coverage is enabled by default (`enable-coverage=true`): Cypress runs via `cy:run:coverage`, `.nyc_output` is archived to OCI artifacts, and coverage is uploaded to Codecov when `codecov-credentials` is present. See [docs/e2e-coverage.md](../docs/e2e-coverage.md).
 
-- The Cypress runner image is built from the PR/push revision's `e2e-tests/` tree, so `run-e2e-test` always executes the image-baked sources at `/tmp/e2e`.
-- Default specs: `tests/component-lifecycle.spec.ts,tests/environment-config.spec.ts` (override via `spec-file`).
-- For `pr-check` / `periodic-local`, tests hit the Kind cluster URL (`https://<kind-ip>:9443`).
-- When Cypress Cloud credentials are present, runs are recorded with `--record` and tagged by `job-type`.
-- Coverage is enabled by default (`enable-coverage=true`): Cypress runs via `cy:run:coverage`, `.nyc_output` is archived to OCI artifacts, and coverage is uploaded to Codecov when `codecov-credentials` is present. Coverage is forced off for `periodic-stage`. See [docs/e2e-coverage.md](../docs/e2e-coverage.md).
-
-**Finally blocks:** Kind is deprovisioned (except `periodic-stage`); PR comment with JUnit results / artifact-browser link is posted for `pr-check`; Slack notification is sent for periodic jobs (unless `skip-slack-notification=true`).
+After the run, Kind is deprovisioned and a PR comment is posted with JUnit results plus an artifact-browser link. Artifacts (videos, screenshots, reports, coverage) are stored in the OCI container configured by `oci-container-repo`.
 
 The container entrypoint's `/e2e` vs `/tmp/e2e` check remains for manual local runs only.
 
 ### Job types overview
 
-| Job type         | What it tests                                             | Where                                                                                                                                                                          |
-| ---------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `pr-check`       | UI from the PR against a freshly provisioned Kind cluster | GitHub Action [`.github/workflows/pr-check.yaml`](../.github/workflows/pr-check.yaml) and Konflux integration pipeline (`job-type=pr-check`, default)                          |
-| `periodic-local` | UI against a freshly provisioned local Kind cluster       | GitHub Action [`.github/workflows/periodic-job-local.yaml`](../.github/workflows/periodic-job-local.yaml) (daily) and Konflux integration pipeline (`job-type=periodic-local`) |
-| `periodic-stage` | UI against staging Konflux (no Kind deploy)               | GitHub Action [`.github/workflows/periodic-job-stage.yaml`](../.github/workflows/periodic-job-stage.yaml) (daily) and Konflux integration pipeline (`job-type=periodic-stage`) |
+The same integration pipeline also supports periodic jobs via `job-type`:
 
-Periodic GitHub Actions also support manual `workflow_dispatch` triggers.
+| Job type         | What it tests                                             | Where                                                       |
+| ---------------- | --------------------------------------------------------- | ----------------------------------------------------------- |
+| `pr-check`       | UI from the PR against a freshly provisioned Kind cluster | Konflux integration pipeline (`job-type=pr-check`, default) |
+| `periodic-local` | UI against a freshly provisioned local Kind cluster       | Konflux integration pipeline (`job-type=periodic-local`)    |
+| `periodic-stage` | UI against staging Konflux (no Kind deploy)               | Konflux integration pipeline (`job-type=periodic-stage`)    |
+
+For `periodic-stage`, Kind provision/deploy/deprovision and coverage are skipped; tests hit staging Konflux with `LOCAL_CLUSTER=false`. Periodic jobs send a Slack notification unless `skip-slack-notification=true`.
 
 ## Reporting issues
 
