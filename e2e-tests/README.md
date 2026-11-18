@@ -177,7 +177,12 @@ Test automation allows us to test early in the process and discover bugs before 
 
 ### PR checks
 
-Cypress E2E tests run on pull requests using a [GitHub Action](https://github.com/konflux-ci/konflux-ui/blob/main/.github/workflows/pr-check.yaml). To be able to run the PR check job, you have to be a public member of `konflux-ci` organization.
+Cypress E2E tests run on pull requests via two paths:
+
+1. **GitHub Action** — [`.github/workflows/pr-check.yaml`](../.github/workflows/pr-check.yaml) (requires public membership in the `konflux-ci` organization)
+2. **Konflux integration pipeline** — `.integration-tests/pipelines/e2e-main-pipeline.yaml` with `job-type=pr-check` (default)
+
+#### GitHub Action
 
 The job installs Konflux from a main branch and Konflux UI from a PR. It runs tests, gathers logs, and allows users to download them directly from the GitHub Action Summary page. Retriggering the job is possible either by pushing a commit to the branch or trigger it directly in the GitHub Action Summary page by `Re-run jobs` button.
 
@@ -200,7 +205,7 @@ The test step executes `pr_check.sh` file which does the tests setup and runs te
 
 #### Konflux integration pipeline
 
-Konflux also runs E2E tests via the integration pipeline (`.integration-tests/pipelines/e2e-main-pipeline.yaml`) using the `run-e2e-konflux-ui` Tekton task. The pipeline is parameterized by `job-type` (`pr-check`, `periodic-local`, or `periodic-stage`).
+Konflux runs E2E tests via the integration pipeline (`.integration-tests/pipelines/e2e-main-pipeline.yaml`) using the `run-e2e-konflux-ui` Tekton task. The pipeline is parameterized by `job-type` (`pr-check`, `periodic-local`, or `periodic-stage`); for pull requests it uses `pr-check`.
 
 **Image resolution and deploy (skipped for `periodic-stage`):**
 
@@ -221,16 +226,15 @@ Konflux also runs E2E tests via the integration pipeline (`.integration-tests/pi
 
 The container entrypoint's `/e2e` vs `/tmp/e2e` check remains for manual local runs only.
 
-### Periodic tests
+### Job types overview
 
-Periodic E2E runs exist in two places:
+| Job type         | What it tests                                             | Where                                                                                                                                                                          |
+| ---------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pr-check`       | UI from the PR against a freshly provisioned Kind cluster | GitHub Action [`.github/workflows/pr-check.yaml`](../.github/workflows/pr-check.yaml) and Konflux integration pipeline (`job-type=pr-check`, default)                          |
+| `periodic-local` | UI against a freshly provisioned local Kind cluster       | GitHub Action [`.github/workflows/periodic-job-local.yaml`](../.github/workflows/periodic-job-local.yaml) (daily) and Konflux integration pipeline (`job-type=periodic-local`) |
+| `periodic-stage` | UI against staging Konflux (no Kind deploy)               | GitHub Action [`.github/workflows/periodic-job-stage.yaml`](../.github/workflows/periodic-job-stage.yaml) (daily) and Konflux integration pipeline (`job-type=periodic-stage`) |
 
-| Job type         | What it tests                                       | Where                                                                                                                                                                          |
-| ---------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `periodic-local` | UI against a freshly provisioned local Kind cluster | GitHub Action [`.github/workflows/periodic-job-local.yaml`](../.github/workflows/periodic-job-local.yaml) (daily) and Konflux integration pipeline (`job-type=periodic-local`) |
-| `periodic-stage` | UI against staging Konflux (no Kind deploy)         | GitHub Action [`.github/workflows/periodic-job-stage.yaml`](../.github/workflows/periodic-job-stage.yaml) (daily) and Konflux integration pipeline (`job-type=periodic-stage`) |
-
-Both can also be triggered manually via `workflow_dispatch`.
+Periodic GitHub Actions also support manual `workflow_dispatch` triggers.
 
 ## Reporting issues
 
