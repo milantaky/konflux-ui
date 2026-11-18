@@ -19,7 +19,7 @@ The important bits are as follows:
 
 Prerequisites:
 
-- Nodejs (20+ version)
+- Nodejs (24+ version)
 - Locally installed Konflux or access to the staging Konflux
 
 > [!NOTE]
@@ -200,13 +200,37 @@ The test step executes `pr_check.sh` file which does the tests setup and runs te
 
 #### Konflux integration pipeline
 
-Konflux also runs E2E tests via the integration pipeline (`.integration-tests/pipelines/e2e-main-pipeline.yaml`) using the `run-e2e-konflux-ui` Tekton task. `format-images` resolves the parallel build tags (`instrumented[-on-pr]-<sha>` for the UI under test, `e2e[-on-pr]-<sha>` for the Cypress runner) — SNAPSHOT's primary `containerImage` is the non-instrumented digest and is not used for deploy. `deploy-konflux` installs Konflux via the operator and injects that instrumented UI image into `deployment/proxy` (initContainer `copy-static-content`), with a pull secret so Kind can pull it. The Cypress runner image (test image) is built from the PR revision's `e2e-tests/` tree, so `run-e2e-test` always executes the image-baked sources at `/tmp/e2e`. When Cypress Cloud credentials are present, runs are recorded with `--record` and tagged by `job-type`.
+Konflux also runs E2E tests via the integration pipeline (`.integration-tests/pipelines/e2e-main-pipeline.yaml`) using the `run-e2e-konflux-ui` Tekton task. The pipeline is parameterized by `job-type` (`pr-check`, `periodic-local`, or `periodic-stage`).
+
+**Image resolution and deploy (skipped for `periodic-stage`):**
+
+1. `format-images` resolves the parallel build tags (`instrumented[-on-pr]-<sha>` for the UI under test, `e2e[-on-pr]-<sha>` for the Cypress runner) — SNAPSHOT's primary `containerImage` is the non-instrumented digest and is not used for deploy.
+2. `provision-kind-cluster` creates a Kind cluster on AWS spot.
+3. `deploy-konflux` installs Konflux via the operator and injects that instrumented UI image into `deployment/proxy` (initContainer `copy-static-content`), with a pull secret so Kind can pull it.
+4. `monitor-webhook-logs` runs in parallel with the E2E task and captures smee-client / pipelines-as-code controller logs for webhook debugging.
+
+**Test execution (`run-e2e-konflux-ui`):**
+
+- The Cypress runner image is built from the PR/push revision's `e2e-tests/` tree, so `run-e2e-test` always executes the image-baked sources at `/tmp/e2e`.
+- Default specs: `tests/component-lifecycle.spec.ts,tests/environment-config.spec.ts` (override via `spec-file`).
+- For `pr-check` / `periodic-local`, tests hit the Kind cluster URL (`https://<kind-ip>:9443`).
+- When Cypress Cloud credentials are present, runs are recorded with `--record` and tagged by `job-type`.
+- Coverage is enabled by default (`enable-coverage=true`): Cypress runs via `cy:run:coverage`, `.nyc_output` is archived to OCI artifacts, and coverage is uploaded to Codecov when `codecov-credentials` is present. Coverage is forced off for `periodic-stage`. See [docs/e2e-coverage.md](../docs/e2e-coverage.md).
+
+**Finally blocks:** Kind is deprovisioned (except `periodic-stage`); PR comment with JUnit results / artifact-browser link is posted for `pr-check`; Slack notification is sent for periodic jobs (unless `skip-slack-notification=true`).
 
 The container entrypoint's `/e2e` vs `/tmp/e2e` check remains for manual local runs only.
 
 ### Periodic tests
 
-Periodic tests are not in place yet.
+Periodic E2E runs exist in two places:
+
+| Job type         | What it tests                                       | Where                                                                                                                                                                          |
+| ---------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `periodic-local` | UI against a freshly provisioned local Kind cluster | GitHub Action [`.github/workflows/periodic-job-local.yaml`](../.github/workflows/periodic-job-local.yaml) (daily) and Konflux integration pipeline (`job-type=periodic-local`) |
+| `periodic-stage` | UI against staging Konflux (no Kind deploy)         | GitHub Action [`.github/workflows/periodic-job-stage.yaml`](../.github/workflows/periodic-job-stage.yaml) (daily) and Konflux integration pipeline (`job-type=periodic-stage`) |
+
+Both can also be triggered manually via `workflow_dispatch`.
 
 ## Reporting issues
 
