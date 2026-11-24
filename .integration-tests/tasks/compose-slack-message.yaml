@@ -28,7 +28,7 @@ spec:
       description: 'Composed Slack notification message'
   steps:
     - name: compose
-      image: registry.access.redhat.com/ubi9/ubi-minimal@sha256:d91be7cea9f03a757d69ad7fcdfcd7849dba820110e7980d5e2a1f46ed06ea3b
+      image: registry.access.redhat.com/ubi9/ubi-minimal@sha256:08d4c70f1baf6537a0728656cf7942d561e74a35916509d205b6519861266352
       computeResources:
         requests:
           memory: 32Mi
