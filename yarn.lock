@@ -4793,9 +4793,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@storybook/test-runner@npm:0.24.4":
-  version: 0.24.4
-  resolution: "@storybook/test-runner@npm:0.24.4"
+"@storybook/test-runner@npm:0.26.1":
+  version: 0.26.1
+  resolution: "@storybook/test-runner@npm:0.26.1"
   dependencies:
     "@babel/core": "npm:^7.22.5"
     "@babel/generator": "npm:^7.22.5"
@@ -4822,7 +4822,7 @@ __metadata:
     storybook: ^0.0.0-0 || ^10.0.0 || ^10.0.0-0 || ^10.1.0-0 || ^10.2.0-0 || ^10.3.0-0 || ^10.4.0-0 || ^10.5.0-0 || ^10.6.0-0
   bin:
     test-storybook: dist/test-storybook.js
-  checksum: 10/e52d1af50631974c4dd1f08d3f57fd5067e106888e8c1beacdb3f6301959cab474c7160748e4557b236fbbc9a0b327b20a31f98a900b0be89a358e20fb969dc3
+  checksum: 10/917bd0ef50fcd5a2ee7ba39e011b8e82b84cd7b110ed6b9d387d4612a375236f3cfb60aa0fcc211018ae9de888cd9956a5d73e5265c4148e1eb445307569a710
   languageName: node
   linkType: hard
 
@@ -13990,7 +13990,7 @@ __metadata:
     "@storybook/addon-webpack5-compiler-swc": "npm:4.0.3"
     "@storybook/react": "npm:10.5.10"
     "@storybook/react-webpack5": "npm:10.5.10"
-    "@storybook/test-runner": "npm:0.24.4"
+    "@storybook/test-runner": "npm:0.26.1"
     "@svgr/webpack": "npm:^8.1.0"
     "@swc/core": "npm:^1.6.13"
     "@swc/jest": "npm:^0.2.36"
