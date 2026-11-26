@@ -76,7 +76,7 @@ spec:
         Image repository without tag for e2e runner and instrumented UI builds.
         Must match the operator build pipeline outputs
         (e2e[-on-pr]-<sha>, instrumented[-on-pr]-<sha>).
-      default: 'quay.io/redhat-user-workloads-stage/mtakac-tenant/konflux-ui/konflux-ui'
+      default: 'quay.io/redhat-user-workloads-stage/mtakac-tenant/slack-message-catalog'
       type: string
     - name: enable-coverage
       description: >-
