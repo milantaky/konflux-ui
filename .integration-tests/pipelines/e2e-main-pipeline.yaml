@@ -362,9 +362,9 @@ spec:
         - input: '$(params.skip-slack-notification)'
           operator: notin
           values: ['true']
-        # - input: '$(params.job-type)'
-        #   operator: notin
-        #   values: ['pr-check']
+        - input: '$(params.job-type)'
+          operator: notin
+          values: ['pr-check']
       taskRef:
         resolver: git
         params:
